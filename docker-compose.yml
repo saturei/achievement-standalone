@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  achievement-service:
+    build: ./java-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=h2
+    networks:
+      - achievement-network
+
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=achievement_db
+      - MYSQL_CHARACTER_SET_SERVER=utf8mb4
+      - MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/init_database.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - achievement-network
+
+networks:
+  achievement-network:
+    driver: bridge
+
+volumes:
+  mysql-data:

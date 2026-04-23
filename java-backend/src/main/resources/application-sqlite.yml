@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: achievement-service
+  
+  datasource:
+    url: jdbc:sqlite:/Users/xuelei/Documents/achievement-standalone/data/achievement.db
+    username: 
+    password: 
+    driver-class-name: org.sqlite.JDBC
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.sqlite.hibernate.dialect.SQLiteDialect
+  
+  flyway:
+    enabled: false
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.example.achievement: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true

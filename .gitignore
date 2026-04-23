@@ -1,0 +1,42 @@
+# 编译输出
+java-backend/target/
+**/*.class
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 日志文件
+*.log
+
+# IDE配置
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 依赖目录
+node_modules/
+
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# 构建输出
+dist/
+build/
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+
+# Trae配置
+.trae/
