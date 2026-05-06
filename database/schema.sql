@@ -323,3 +323,52 @@ CREATE INDEX IF NOT EXISTS idx_achievement_approvals_status ON achievement_appro
 -- users (用户) ──────── achievements (成果)
 --                       ├── achievement_checkout_history (出库历史)
 --                       └── achievement_approvals (审批记录)
+
+-- =====================================================
+-- 目标统计模块数据库表结构
+-- =====================================================
+
+-- 目标配置表
+CREATE TABLE IF NOT EXISTS targets (
+    id VARCHAR(50) PRIMARY KEY,
+    department VARCHAR(100),
+    organization VARCHAR(100),
+    category VARCHAR(50),
+    sub_category VARCHAR(50),
+    target_type VARCHAR(50),
+    year INTEGER,
+    annual_target DECIMAL(15,2),
+    q1_target DECIMAL(15,2),
+    q2_target DECIMAL(15,2),
+    q3_target DECIMAL(15,2),
+    q4_target DECIMAL(15,2),
+    owner VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_targets_year ON targets(year);
+CREATE INDEX IF NOT EXISTS idx_targets_organization ON targets(organization);
+CREATE INDEX IF NOT EXISTS idx_targets_department ON targets(department);
+CREATE INDEX IF NOT EXISTS idx_targets_owner ON targets(owner);
+
+-- 实际数据表
+CREATE TABLE IF NOT EXISTS actual_data (
+    id VARCHAR(50) PRIMARY KEY,
+    target_id VARCHAR(50),
+    organization VARCHAR(100),
+    data_type VARCHAR(50),
+    year INTEGER,
+    month INTEGER,
+    actual_value DECIMAL(15,2),
+    remark TEXT,
+    created_by VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (target_id) REFERENCES targets(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_actual_data_target_id ON actual_data(target_id);
+CREATE INDEX IF NOT EXISTS idx_actual_data_year ON actual_data(year);
+CREATE INDEX IF NOT EXISTS idx_actual_data_month ON actual_data(month);
+CREATE INDEX IF NOT EXISTS idx_actual_data_organization ON actual_data(organization);

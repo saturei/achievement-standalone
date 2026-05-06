@@ -23,7 +23,9 @@ public interface AchievementRepository extends JpaRepository<Achievement, String
            "(:achievementForm IS NULL OR achievement_form = :achievementForm) AND " +
            "(:productId IS NULL OR product_id = :productId) AND " +
            "(:keyword IS NULL OR name LIKE '%' || :keyword || '%' OR description LIKE '%' || :keyword || '%' OR id LIKE '%' || :keyword || '%') AND " +
-           "(:includeDeleted = 1 OR status <> 'DELETED') " +
+           "(:includeDeleted = 1 OR status <> 'DELETED') AND " +
+           "(:plannedAcceptanceMonth IS NULL OR strftime('%Y-%m', planned_acceptance_date) = :plannedAcceptanceMonth) AND " +
+           "(:organizationName IS NULL OR organization_name = :organizationName) " +
            "ORDER BY created_at DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
     List<Achievement> findByConditionsNative(
             @Param("status") String status,
@@ -31,6 +33,8 @@ public interface AchievementRepository extends JpaRepository<Achievement, String
             @Param("productId") String productId,
             @Param("keyword") String keyword,
             @Param("includeDeleted") int includeDeleted,
+            @Param("plannedAcceptanceMonth") String plannedAcceptanceMonth,
+            @Param("organizationName") String organizationName,
             @Param("limit") int limit,
             @Param("offset") int offset);
 
@@ -39,13 +43,17 @@ public interface AchievementRepository extends JpaRepository<Achievement, String
            "(:achievementForm IS NULL OR achievement_form = :achievementForm) AND " +
            "(:productId IS NULL OR product_id = :productId) AND " +
            "(:keyword IS NULL OR name LIKE '%' || :keyword || '%' OR description LIKE '%' || :keyword || '%' OR id LIKE '%' || :keyword || '%') AND " +
-           "(:includeDeleted = 1 OR status <> 'DELETED')", nativeQuery = true)
+           "(:includeDeleted = 1 OR status <> 'DELETED') AND " +
+           "(:plannedAcceptanceMonth IS NULL OR strftime('%Y-%m', planned_acceptance_date) = :plannedAcceptanceMonth) AND " +
+           "(:organizationName IS NULL OR organization_name = :organizationName)", nativeQuery = true)
     long countByConditionsNative(
             @Param("status") String status,
             @Param("achievementForm") String achievementForm,
             @Param("productId") String productId,
             @Param("keyword") String keyword,
-            @Param("includeDeleted") int includeDeleted);
+            @Param("includeDeleted") int includeDeleted,
+            @Param("plannedAcceptanceMonth") String plannedAcceptanceMonth,
+            @Param("organizationName") String organizationName);
 
     List<Achievement> findByNameAndProductExternalVersionOrderByCreatedAtDesc(
             String name, String productExternalVersion);
@@ -61,4 +69,7 @@ public interface AchievementRepository extends JpaRepository<Achievement, String
 
     @Query(value = "SELECT COUNT(*) FROM achievements WHERE status <> 'DELETED'", nativeQuery = true)
     long countAllExcludingDeleted();
+
+    @Query(value = "SELECT DISTINCT organization_name FROM achievements WHERE organization_name IS NOT NULL AND organization_name <> '' AND status <> 'DELETED' ORDER BY organization_name", nativeQuery = true)
+    List<String> findDistinctOrganizationNames();
 }

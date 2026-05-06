@@ -12,7 +12,8 @@ import java.util.List;
 public interface AchievementService {
 
     AchievementListResponse getAchievements(int page, int pageSize, String status, String achievementForm, 
-                                           String productId, String keyword, Boolean includeDeleted);
+                                           String productId, String keyword, Boolean includeDeleted,
+                                           String plannedAcceptanceMonth, String organizationName);
 
     AchievementStatisticsResponse getStatistics();
 
@@ -35,4 +36,6 @@ public interface AchievementService {
     List<StatusRecordResponse> getStatusRecords(String achievementId);
     
     List<VersionRecordResponse> getVersionRecords(String achievementId);
+
+    List<String> getAllOrganizations();
 }

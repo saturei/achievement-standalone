@@ -8,6 +8,11 @@ import RegisterAchievement from '../views/RegisterAchievement.vue'
 
 const routes = [
   {
+    path: '/target-statistics',
+    name: 'TargetStatistics',
+    component: () => import('../views/TargetStatistics.vue')
+  },
+  {
     path: '/',
     name: 'AchievementList',
     component: AchievementList
@@ -36,6 +41,11 @@ const routes = [
     path: '/achievement/:id/register',
     name: 'RegisterAchievement',
     component: RegisterAchievement
+  },
+  {
+    path: '/target-edit',
+    name: 'TargetEdit',
+    component: () => import('../views/TargetEdit.vue')
   }
 ]
 

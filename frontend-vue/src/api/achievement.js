@@ -54,5 +54,10 @@ export default {
   // 获取变更历史
   getHistory(id) {
     return api.get(`/achievements/${id}/history`)
+  },
+
+  // 获取机构列表
+  getOrganizations() {
+    return api.get('/achievements/organizations')
   }
 }

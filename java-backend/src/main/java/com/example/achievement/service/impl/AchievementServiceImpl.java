@@ -49,7 +49,8 @@ public class AchievementServiceImpl implements AchievementService {
     @Override
     @Transactional(readOnly = true)
     public AchievementListResponse getAchievements(int page, int pageSize, String status, String achievementForm,
-                                                   String productId, String keyword, Boolean includeDeleted) {
+                                                   String productId, String keyword, Boolean includeDeleted,
+                                                   String plannedAcceptanceMonth, String organizationName) {
         int offset = (page - 1) * pageSize;
         
         String statusStr = null;
@@ -73,12 +74,14 @@ public class AchievementServiceImpl implements AchievementService {
         String formParam = (achievementForm != null && !achievementForm.trim().isEmpty()) ? achievementForm : null;
         String productIdParam = (productId != null && !productId.trim().isEmpty()) ? productId : null;
         String keywordParam = (keyword != null && !keyword.trim().isEmpty()) ? keyword : null;
+        String plannedAcceptanceMonthParam = (plannedAcceptanceMonth != null && !plannedAcceptanceMonth.trim().isEmpty()) ? plannedAcceptanceMonth : null;
+        String organizationNameParam = (organizationName != null && !organizationName.trim().isEmpty()) ? organizationName : null;
         
         List<Achievement> achievements = achievementRepository.findByConditionsNative(
-                statusStr, formParam, productIdParam, keywordParam, includeDeletedFlag, pageSize, offset);
+                statusStr, formParam, productIdParam, keywordParam, includeDeletedFlag, plannedAcceptanceMonthParam, organizationNameParam, pageSize, offset);
 
         long total = achievementRepository.countByConditionsNative(
-                statusStr, formParam, productIdParam, keywordParam, includeDeletedFlag);
+                statusStr, formParam, productIdParam, keywordParam, includeDeletedFlag, plannedAcceptanceMonthParam, organizationNameParam);
 
         List<AchievementResponse> items = achievements.stream()
                 .map(this::convertToResponse)
@@ -573,5 +576,11 @@ public class AchievementServiceImpl implements AchievementService {
         response.setChangedBy(record.getOperator());
         response.setChangeTime(record.getChangeTime());
         return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> getAllOrganizations() {
+        return achievementRepository.findDistinctOrganizationNames();
     }
 }

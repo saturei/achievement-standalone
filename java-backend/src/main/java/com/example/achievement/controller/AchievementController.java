@@ -33,9 +33,11 @@ public class AchievementController {
             @RequestParam(required = false) String achievementForm,
             @RequestParam(required = false) String productId,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Boolean includeDeleted) {
+            @RequestParam(required = false) Boolean includeDeleted,
+            @RequestParam(required = false) String plannedAcceptanceMonth,
+            @RequestParam(required = false) String organizationName) {
         return ResponseEntity.ok(achievementService.getAchievements(
-                page, pageSize, status, achievementForm, productId, keyword, includeDeleted));
+                page, pageSize, status, achievementForm, productId, keyword, includeDeleted, plannedAcceptanceMonth, organizationName));
     }
 
     @GetMapping("/statistics")
@@ -110,5 +112,11 @@ public class AchievementController {
     public ResponseEntity<List<VersionRecordResponse>> getVersionRecords(
             @PathVariable String achievementId) {
         return ResponseEntity.ok(achievementService.getVersionRecords(achievementId));
+    }
+
+    @GetMapping("/organizations")
+    @Operation(summary = "获取所有机构列表")
+    public ResponseEntity<List<String>> getAllOrganizations() {
+        return ResponseEntity.ok(achievementService.getAllOrganizations());
     }
 }

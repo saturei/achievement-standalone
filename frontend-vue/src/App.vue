@@ -10,6 +10,7 @@
             router
             class="header-menu"
           >
+            <el-menu-item index="/target-statistics">目标统计</el-menu-item>
             <el-menu-item index="/">成果列表</el-menu-item>
             <el-menu-item index="/pre-register">预注册</el-menu-item>
           </el-menu>

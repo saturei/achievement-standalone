@@ -18,6 +18,13 @@
     <name>achievement-service</name>
     <description>成果管理系统后端服务</description>
 
+    <repositories>
+        <repository>
+            <id>projectlombok.org</id>
+            <url>https://projectlombok.org/edge-releases</url>
+        </repository>
+    </repositories>
+
     <properties>
         <java.version>10</java.version>
         <maven.compiler.source>10</maven.compiler.source>
@@ -67,7 +74,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.8</version>
+            <version>edge-SNAPSHOT</version>
             <optional>true</optional>
         </dependency>
 
@@ -148,7 +155,7 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.8</version>
+                            <version>edge-SNAPSHOT</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
