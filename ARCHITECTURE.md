@@ -214,7 +214,8 @@ targets (目标表)
 
 | 方法 | 路径 | 说明 | 请求参数 |
 |---|---|---|---|
-| GET | `/api/targets/statistics` | 获取目标统计数据 | `year`(必填), `dimension`(默认organization), `product`, `organization`, `owner`, `subCategory`(选填) |
+| GET | `/api/targets/statistics` | 获取目标统计数据 | `year`(必填), `dimension`(默认organization), `product`(部门筛选用), `organization`(支持逗号分隔多选), `owner`, `subCategory`(选填) |
+| GET | `/api/targets/quarterly-summary` | 获取季度汇总数据 | `year`(必填), `organization`(支持逗号分隔,选填) |
 | GET | `/api/targets/distribution` | 获取月度成果分布 | `year`(必填) |
 | GET | `/api/targets/products` | 获取所有产品列表 | — |
 | GET | `/api/targets/organizations` | 获取所有机构列表 | — |
@@ -279,6 +280,38 @@ targets (目标表)
 - `确权目标` = subCategory 含"确权"的记录, target=annualTarget, actual=q1+q2+q3+q4 actual
 - `研发成果` = subCategory="研发成果"的记录, target=rdActual+rdPlanned (从 achievements 表统计), actual=有实际验收日期+已登记的数量
 - `预算控制` = subCategory="费用"的记录, target=annualTarget, actual=q1+q2+q3+q4 actual
+
+#### 3.1.2 GET /api/targets/quarterly-summary 响应结构
+
+```json
+{
+  "signing": [
+    {"quarter": "Q1", "target": 23090000, "actual": 23470000, "completionRate": 101.65},
+    {"quarter": "Q2", "target": 48030000, "actual": 0, "completionRate": 0},
+    {"quarter": "Q3", "target": 40300000, "actual": 0, "completionRate": 0},
+    {"quarter": "Q4", "target": 34860000, "actual": 0, "completionRate": 0}
+  ],
+  "confirmation": [
+    {"quarter": "Q1", "target": 0, "actual": 0, "completionRate": 0},
+    {"quarter": "Q2", "target": 2000000, "actual": 0, "completionRate": 0},
+    {"quarter": "Q3", "target": 15000000, "actual": 0, "completionRate": 0},
+    {"quarter": "Q4", "target": 55390000, "actual": 0, "completionRate": 0}
+  ],
+  "budget": [
+    {"quarter": "Q1", "target": 5168580.02, "actual": 5930000, "completionRate": 114.73},
+    {"quarter": "Q2", "target": 4005401.82, "actual": 0, "completionRate": 0},
+    {"quarter": "Q3", "target": 3669620.42, "actual": 0, "completionRate": 0},
+    {"quarter": "Q4", "target": 3475970.42, "actual": 0, "completionRate": 0}
+  ]
+}
+```
+
+**计算逻辑**:
+- 按 subCategory 分组：`signing`(含"签约") / `confirmation`(含"确权") / `budget`(="费用")
+- 每组分别累加所有机构的 Q1-Q4 target/actual
+- organization 参数支持逗号分隔的多机构筛选
+
+---
 
 ### 3.2 成果管理 — `/api/achievements`
 
@@ -359,7 +392,7 @@ request.post('/targets/import', formData, {
 frontend-vue/src/api/
   ├── request.js          # axios 实例配置 (baseURL=/api, timeout=10s)
   ├── achievement.js      # 成果管理 API (12个方法)
-  └── target.js           # 目标统计 API (11个方法)
+  └── target.js           # 目标统计 API (12个方法, 含 getQuarterlySummary)
 ```
 
 ### 4.4 数据流示例 (目标统计页)
@@ -368,7 +401,7 @@ frontend-vue/src/api/
 TargetStatistics.vue
   │
   ├── loadFilterOptions()
-  │   └── GET /api/targets/products
+  │   └── GET /api/targets/products → departments
   │   └── GET /api/targets/organizations
   │   └── GET /api/targets/owners
   │
@@ -379,12 +412,18 @@ TargetStatistics.vue
   │           summary.confirmationTarget/Actual/Rate → 确权目标卡片
   │           summary.budgetTarget/Actual/Rate → 预算控制卡片
   │
+  ├── loadQuarterlySummary()
+  │   └── GET /api/targets/quarterly-summary?year=2026
+  │       ├── signing → 签约收入季度对比图 (Q1-Q4)
+  │       ├── confirmation → 确权收入季度对比图 (Q1-Q4)
+  │       └── budget → 预算控制季度对比图 (Q1-Q4)
+  │
   ├── loadMonthlyDistribution()
-  │   └── GET /api/targets/distribution?year=2026 → 月度图表
+  │   └── GET /api/targets/distribution?year=2026 → 研发成果月度分布图
   │
-  ├── loadTableData()
-  │   └── GET /api/targets/statistics?year=2026 → 机构目标达成进度表
-  │
+  └── loadTableData()
+      └── GET /api/targets/statistics?year=2026 → 机构目标达成进度表
+
   └── 编辑/新增
       └── POST /api/targets (createTarget)
       └── PUT /api/targets/{id} (updateTarget)
@@ -402,8 +441,8 @@ handleDeleteRow()
 | 字段 | 类型 | 说明 | 数据来源 |
 |---|---|---|---|
 | year | Number | 年度 (2024/2025/2026) | 硬编码 |
-| product | String | 产品 | GET /api/targets/products |
-| organization | String | 机构 | GET /api/targets/organizations |
+| department | String | 部门（原"产品"修改） | GET /api/targets/products |
+| organizations | String[] | 机构（多选） | 部门联动筛选: organizationDepartmentOptions |
 | owner | String | 负责人 | GET /api/targets/owners |
 | status | String | 成果状态 (PRE_REGISTER/REGISTER/RECORDED) | 硬编码 |
 | subCategory | String | 细分目标 | 硬编码枚举 |
@@ -452,6 +491,26 @@ handleDeleteRow()
 |---|---|---|---|
 | 签约目标/确权目标/预算控制 | 元 (BigDecimal) | 万元 | 值 / 10000, `formatMoney()` (千分位+两位小数) |
 | 研发成果 | 个 (Integer) | 个 | 原值展示, `formatInteger()` (千分位整数) |
+
+### 5.6 图表可视化布局
+
+目标统计页底部为 **2×2 四图表看板**：
+
+| 位置 | 图表标题 | 图表类型 | 数据来源 |
+|---|---|---|---|
+| 左上 | 签约收入 — 季度目标 vs 实际 | 分组柱状图 | `GET /api/targets/quarterly-summary` → signing |
+| 右上 | 确权收入 — 季度目标 vs 实际 | 分组柱状图 | `GET /api/targets/quarterly-summary` → confirmation |
+| 左下 | 研发成果 — 月度分布 | 堆叠柱状图 | `GET /api/targets/distribution` |
+| 右下 | 预算控制 — 季度预算 vs 实际支出 | 分组柱状图 | `GET /api/targets/quarterly-summary` → budget |
+
+**季度对比图规格**:
+- X 轴: Q1 / Q2 / Q3 / Q4
+- 两个系列: 目标(浅色) vs 实际(深色)
+- 签约: 浅蓝 `#a0cfff` / 深蓝 `#409eff`
+- 确权: 浅橙 `#f4cfa0` / 深橙 `#e6a23c`
+- 预算: 浅红 `#f0a0a0` / 深红 `#f56c6c`
+- Y 轴单位: 万元
+- Tooltip 显示: 季度 / 目标(万元) / 实际(万元) / 达成率(%)
 
 ---
 
