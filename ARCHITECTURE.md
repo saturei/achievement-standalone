@@ -1,6 +1,6 @@
 # 成果管理系统 — 架构文档
 
-> 版本: 1.0.0 | 最后更新: 2026-04-30
+> 版本: 1.2.0 | 最后更新: 2026-05-07
 
 ---
 
@@ -325,10 +325,40 @@ targets (目标表)
 | POST | `/api/achievements/pre-register` | 成果预注册 | Body: AchievementPreRegisterRequest |
 | POST | `/api/achievements/{achievementId}/register` | 成果注册 | Path: achievementId |
 | POST | `/api/achievements/{achievementId}/record` | 成果登记 | Path: achievementId |
-| POST | `/api/achievements/{achievementId}/change` | 成果变更 | Path: achievementId |
+| POST | `/api/achievements/{achievementId}/change` | 成果变更 | Path: achievementId; Body: AchievementChangeRequest |
 | PUT | `/api/achievements/{achievementId}/offline` | 成果下架 | Path: achievementId |
 | PUT | `/api/achievements/{achievementId}/online` | 成果上架 | Path: achievementId |
 | PUT | `/api/achievements/{achievementId}/delete` | 成果删除 | Path: achievementId |
+
+#### 3.2.1 POST /api/achievements/{achievementId}/change 请求体 (AchievementChangeRequest)
+
+> ⚠️ **v1.2.0 更新**: 前端变更页面已与预注册页面对齐，移除了多余字段。
+
+| 字段名 | 类型 | 必填 | 说明 | 与预注册对比 |
+|---|---|---|---|---|
+| `version` | String | 否 | 成果版本 | 对应预注册 |
+| `achievementTarget` | String | 否 | 成果目标描述 | 对应预注册 |
+| `owner` | String | 否 | 负责人 | 对应预注册 |
+| `moduleId` | String | 否 | 关联模块ID | 对应预注册 name→moduleName |
+| `plannedAcceptanceDate` | LocalDate | 否 | 计划验收日期 | 对应预注册 |
+| `acceptor` | String | 否 | 验收人 | 对应预注册 |
+| `acceptanceMethod` | String | 否 | 验收方式和要求(合并) | 预注册为 acceptanceMethod + acceptanceRequirements 两个字段 |
+| `functionListFile` | String | 否 | 功能清单文件 | 对应预注册 |
+| `packageIds` | String | 否 | 关联套餐 | 对应预注册 |
+| `relatedProjectId` | String | 否 | 关联项目ID | 对应预注册 |
+| `relatedProjectName` | String | 否 | 关联项目名称 | 对应预注册 |
+| `relatedOrderId` | String | 否 | 关联订单ID | 对应预注册 |
+| `relatedOrderName` | String | 否 | 关联订单名称 | 对应预注册 |
+| `changeDescription` | String | 否 | 变更说明 | 变更特有 |
+| `productExternalVersion` | String | 否 | 产品对外版本(回显) | 变更特有 |
+| `riskTags` | List\<String\> | 否 | 风险标签(回显) | 变更特有 |
+
+**v1.2.0 变更记录**:
+- ❌ **已移除** `estimatedAcceptanceMonth` (预估验收年月) — 与预注册对齐
+- ❌ **已移除** `acceptanceOrganization` (验收组织) — 与预注册对齐  
+- ❌ **已移除** 前端"产品版本"字段 — 与"成果版本"冲突
+- 🔀 **已合并** `acceptanceMethod` 与 `acceptanceRequirements` → 前端合并为"验收方式和要求"一个字段
+- 🔒 **回显不可修改字段**: `productName`, `achievementForm`, `saleType`, `hasBaseline`, `requirementProposer`, `organizationName`, `departmentName`
 
 ### 3.3 数据导入 — `/api/data`
 
@@ -391,38 +421,41 @@ request.post('/targets/import', formData, {
 ```
 frontend-vue/src/api/
   ├── request.js          # axios 实例配置 (baseURL=/api, timeout=10s)
-  ├── achievement.js      # 成果管理 API (12个方法)
-  └── target.js           # 目标统计 API (12个方法, 含 getQuarterlySummary)
+  ├── achievement.js      # 成果管理 API (含 preRegister, changeHistory, change)
+  └── target.js           # 目标统计 API (含 getQuarterlySummary, getMonthlyDistribution)
 ```
 
-### 4.4 数据流示例 (目标统计页)
+### 4.4 数据流示例 (目标统计页 v1.2.0)
 
 ```
 TargetStatistics.vue
   │
-  ├── loadFilterOptions()
-  │   └── GET /api/targets/products → departments
-  │   └── GET /api/targets/organizations
-  │   └── GET /api/targets/owners
+  ├── onMounted()
+  │   ├── loadFilterOptions()
+  │   │   └── GET /api/targets/products → departments
+  │   │   └── GET /api/targets/organizations
+  │   │   └── GET /api/targets/owners
+  │   ├── loadStatistics()
+  │   │   └── GET /api/targets/statistics?year=2026&dimension=organization&organization=xxx,yyy
+  │   │       ├── 响应顶层 rdActual, rdPlanned, rdTarget → 研发成果卡片
+  │   │       └── summary.signingTarget/Actual/Rate → 签约目标卡片
+  │   │           summary.confirmationTarget/Actual/Rate → 确权目标卡片
+  │   │           summary.budgetTarget/Actual/Rate → 预算控制卡片
+  │   ├── loadQuarterlySummary()
+  │   │   └── GET /api/targets/quarterly-summary?year=2026&organization=xxx,yyy
+  │   │       ├── signing → 签约收入季度对比图 (Q1-Q4 柱状图)
+  │   │       ├── confirmation → 确权收入季度对比图 (Q1-Q4 柱状图)
+  │   │       └── budget → 预算控制季度对比图 (Q1-Q4 柱状图)
+  │   ├── loadMonthlyDistribution()
+  │   │   └── GET /api/targets/distribution?year=2026 → 研发成果月度分布图
+  │   └── loadTableData()
+  │       └── GET /api/targets/statistics?year=2026 → 机构目标达成进度表
   │
-  ├── loadStatistics()
-  │   └── GET /api/targets/statistics?year=2026&dimension=organization
-  │       ├── 响应顶层 rdActual, rdPlanned, rdTarget → 研发成果卡片
-  │       └── summary.signingTarget/Actual/Rate → 签约目标卡片
-  │           summary.confirmationTarget/Actual/Rate → 确权目标卡片
-  │           summary.budgetTarget/Actual/Rate → 预算控制卡片
+  ├── handleDepartmentChange() (v1.2.0 联动)
+  │   ├── 选择部门 → 清空机构,机构切换为多选
+  │   └── 清空部门 → 机构恢复单选
   │
-  ├── loadQuarterlySummary()
-  │   └── GET /api/targets/quarterly-summary?year=2026
-  │       ├── signing → 签约收入季度对比图 (Q1-Q4)
-  │       ├── confirmation → 确权收入季度对比图 (Q1-Q4)
-  │       └── budget → 预算控制季度对比图 (Q1-Q4)
-  │
-  ├── loadMonthlyDistribution()
-  │   └── GET /api/targets/distribution?year=2026 → 研发成果月度分布图
-  │
-  └── loadTableData()
-      └── GET /api/targets/statistics?year=2026 → 机构目标达成进度表
+  └── handleSearch() → 触发所有 load* 函数重新加载
 
   └── 编辑/新增
       └── POST /api/targets (createTarget)
@@ -430,6 +463,24 @@ TargetStatistics.vue
 
 handleDeleteRow()
   └── DELETE /api/targets/{id}
+```
+
+### 4.5 数据流示例 (成果变更页 v1.2.0)
+
+```
+ChangeAchievement.vue
+  │
+  ├── onMounted()
+  │   └── GET /api/achievements/{achievementId} → 加载当前成果详情
+  │       ├── 回显不可修改字段: productName, achievementForm, saleType
+  │       ├── 回显不可修改字段: hasBaseline, requirementProposer, organizationName, departmentName
+  │       └── 填充可编辑字段: version, owner, moduleId, 等
+  │   └── GET /api/achievements/{achievementId}/history → 加载变更历史
+  │
+  └── handleSubmit()
+      └── POST /api/achievements/{achievementId}/change
+          ├── Body: 仅包含非空字段 (动态构建 submitData)
+          └── 成功后跳转回成果详情页
 ```
 
 ---
@@ -441,11 +492,17 @@ handleDeleteRow()
 | 字段 | 类型 | 说明 | 数据来源 |
 |---|---|---|---|
 | year | Number | 年度 (2024/2025/2026) | 硬编码 |
-| department | String | 部门（原"产品"修改） | GET /api/targets/products |
-| organizations | String[] | 机构（多选） | 部门联动筛选: organizationDepartmentOptions |
+| department | String | 部门（原"产品"修改,选择部门后机构变为多选） | GET /api/targets/products |
+| organizations | String[] | 机构（多选,支持逗号分隔传给后端） | 部门联动筛选 |
 | owner | String | 负责人 | GET /api/targets/owners |
 | status | String | 成果状态 (PRE_REGISTER/REGISTER/RECORDED) | 硬编码 |
 | subCategory | String | 细分目标 | 硬编码枚举 |
+
+**部门-机构联动逻辑 (v1.2.0)**:
+- 不选部门时：机构为单选下拉框
+- 选择部门后：机构切换为多选，只显示该部门下属的机构
+- 联动映射基于 `organizationDepartmentMap`（见 §5.2）
+- 选择部门后自动清空机构选择，触发数据重新加载
 
 ### 5.2 机构-部门映射 (organizationDepartmentOptions)
 

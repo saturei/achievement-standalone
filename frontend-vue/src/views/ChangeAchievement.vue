@@ -18,8 +18,6 @@
             label-width="120px"
             label-position="right"
           >
-            <el-divider content-position="left">基础信息</el-divider>
-            
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="成果名称">
@@ -27,8 +25,42 @@
                 </el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item label="成果版本">
+                <el-form-item label="关联产品">
+                  <el-input :value="form.productName" disabled />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="成果版本" prop="version">
                   <el-input v-model="form.version" placeholder="请输入成果版本" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="成果形态">
+                  <el-input :value="form.achievementForm" disabled />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="可售类型">
+                  <el-input :value="form.saleType" disabled />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="是否有基线">
+                  <el-input :value="form.hasBaseline" disabled />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="需求提出人">
+                  <el-input :value="form.requirementProposer" disabled />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -41,12 +73,89 @@
               </el-col>
             </el-row>
 
-            <el-form-item label="成果描述">
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="关联机构">
+                  <el-input :value="form.organizationName" disabled />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="部门名称">
+                  <el-input :value="form.departmentName" disabled />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="关联模块">
+                  <el-input v-model="form.moduleId" placeholder="请输入关联模块" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-form-item label="成果目标描述">
               <el-input
-                v-model="form.description"
+                v-model="form.achievementTarget"
                 type="textarea"
                 :rows="3"
-                placeholder="请输入成果描述"
+                placeholder="请输入成果目标描述"
+              />
+            </el-form-item>
+
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="上传功能清单">
+                  <el-upload
+                    class="file-upload"
+                    :action="uploadUrl"
+                    :show-file-list="false"
+                    :before-upload="beforeUpload"
+                    :on-success="handleUploadSuccess"
+                    :on-error="handleUploadError"
+                  >
+                    <el-button type="primary" size="small">上传文件</el-button>
+                    <template #tip>
+                      <div class="upload-tip" v-if="form.functionListFile">
+                        已上传: {{ getFileName(form.functionListFile) }}
+                        <el-link type="danger" @click.stop="form.functionListFile = ''">删除</el-link>
+                      </div>
+                    </template>
+                  </el-upload>
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="关联套餐">
+                  <el-input v-model="form.packageIds" placeholder="请输入关联套餐" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="计划验收日期">
+                  <el-date-picker
+                    v-model="form.plannedAcceptanceDate"
+                    type="date"
+                    placeholder="选择日期"
+                    value-format="YYYY-MM-DD"
+                    style="width: 100%"
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="验收人">
+                  <el-input v-model="form.acceptor" placeholder="请输入验收人" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <el-form-item label="验收方式和要求">
+              <el-input
+                v-model="form.acceptanceMethod"
+                type="textarea"
+                :rows="2"
+                placeholder="请输入验收方式和要求"
               />
             </el-form-item>
 
@@ -72,95 +181,6 @@
               <el-col :span="12">
                 <el-form-item label="关联订单名称">
                   <el-input v-model="form.relatedOrderName" placeholder="请输入关联订单名称" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-
-            <el-divider content-position="left">计划信息</el-divider>
-
-            <el-form-item label="成果目标描述">
-              <el-input
-                v-model="form.achievementTarget"
-                type="textarea"
-                :rows="3"
-                placeholder="请输入成果目标描述"
-              />
-            </el-form-item>
-
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="计划验收日期">
-                  <el-date-picker
-                    v-model="form.plannedAcceptanceDate"
-                    type="date"
-                    placeholder="选择日期"
-                    value-format="YYYY-MM-DD"
-                    style="width: 100%"
-                  />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="预估验收年月">
-                  <el-input v-model="form.estimatedAcceptanceMonth" placeholder="如：2026年01月" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-
-            <el-form-item label="验收方式">
-              <el-input
-                v-model="form.acceptanceMethod"
-                type="textarea"
-                :rows="2"
-                placeholder="请输入验收方式"
-              />
-            </el-form-item>
-
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="验收人">
-                  <el-input v-model="form.acceptor" placeholder="请输入验收人" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="验收组织">
-                  <el-input v-model="form.acceptanceOrganization" placeholder="请输入验收组织" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-
-            <el-form-item label="验收要求">
-              <el-input
-                v-model="form.acceptanceRequirements"
-                type="textarea"
-                :rows="2"
-                placeholder="请输入验收要求"
-              />
-            </el-form-item>
-
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="功能清单">
-                  <el-upload
-                    class="file-upload"
-                    :action="uploadUrl"
-                    :show-file-list="false"
-                    :before-upload="beforeUpload"
-                    :on-success="handleUploadSuccess"
-                    :on-error="handleUploadError"
-                  >
-                    <el-button type="primary" size="small">上传文件</el-button>
-                    <template #tip>
-                      <div class="upload-tip" v-if="form.functionListFile">
-                        已上传: {{ getFileName(form.functionListFile) }}
-                        <el-link type="danger" @click.stop="form.functionListFile = ''">删除</el-link>
-                      </div>
-                    </template>
-                  </el-upload>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="关联套餐">
-                  <el-input v-model="form.packageIds" placeholder="请输入关联套餐" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -240,21 +260,25 @@ const uploadUrl = '/api/upload'
 
 const form = reactive({
   version: '',
+  achievementForm: '',
+  saleType: '',
+  hasBaseline: '',
+  requirementProposer: '',
   owner: '',
-  description: '',
+  organizationName: '',
+  departmentName: '',
+  moduleId: '',
+  moduleName: '',
+  achievementTarget: '',
+  functionListFile: '',
+  packageIds: '',
+  plannedAcceptanceDate: '',
+  acceptanceMethod: '',
+  acceptor: '',
   relatedProjectId: '',
   relatedProjectName: '',
   relatedOrderId: '',
   relatedOrderName: '',
-  acceptanceRequirements: '',
-  achievementTarget: '',
-  plannedAcceptanceDate: '',
-  estimatedAcceptanceMonth: '',
-  acceptanceMethod: '',
-  acceptor: '',
-  acceptanceOrganization: '',
-  functionListFile: '',
-  packageIds: '',
   changeDescription: ''
 })
 
@@ -265,14 +289,10 @@ const rules = {
 const fieldNames = {
   'achievementTarget': '成果目标',
   'plannedAcceptanceDate': '计划验收日期',
-  'estimatedAcceptanceMonth': '预估验收年月',
-  'acceptanceMethod': '验收方式',
+  'acceptanceMethod': '验收方式和要求',
   'acceptor': '验收人',
-  'acceptanceOrganization': '验收组织',
-  'acceptanceRequirements': '验收要求',
   'functionListFile': '功能清单',
   'packageIds': '关联套餐',
-  'description': '成果描述',
   'owner': '负责人',
   'relatedProjectId': '关联项目',
   'relatedOrderId': '关联订单'
@@ -328,19 +348,24 @@ const loadDetail = async () => {
     const res = await achievementApi.getAchievement(route.params.id)
     currentAchievement.value = res
     form.version = res.version || ''
+    form.productName = (res.productName ? res.productName + '（' + res.productId + '）' : '') || ''
+    form.achievementForm = res.achievementForm || ''
+    form.saleType = res.saleType || ''
+    form.hasBaseline = res.hasBaseline || ''
+    form.requirementProposer = res.requirementProposer || ''
     form.owner = res.owner || ''
-    form.description = res.description || ''
+    form.organizationName = res.organizationName || ''
+    form.departmentName = res.departmentName || ''
+    form.moduleId = res.moduleId || ''
+    form.moduleName = res.moduleName || ''
     form.relatedProjectId = res.relatedProjectId || ''
     form.relatedProjectName = res.relatedProjectName || ''
     form.relatedOrderId = res.relatedOrderId || ''
     form.relatedOrderName = res.relatedOrderName || ''
-    form.acceptanceRequirements = res.acceptanceRequirements || ''
     form.achievementTarget = res.achievementTarget || ''
     form.plannedAcceptanceDate = res.plannedAcceptanceDate || ''
-    form.estimatedAcceptanceMonth = res.estimatedAcceptanceMonth || ''
     form.acceptanceMethod = res.acceptanceMethod || ''
     form.acceptor = res.acceptor || ''
-    form.acceptanceOrganization = res.acceptanceOrganization || ''
     form.functionListFile = res.functionListFile || ''
     form.packageIds = res.packageIds || ''
   } catch (error) {
@@ -385,22 +410,28 @@ const handleSubmit = async () => {
 
 const handleReset = () => {
   if (currentAchievement.value) {
-    form.version = currentAchievement.value.version || ''
-    form.owner = currentAchievement.value.owner || ''
-    form.description = currentAchievement.value.description || ''
-    form.relatedProjectId = currentAchievement.value.relatedProjectId || ''
-    form.relatedProjectName = currentAchievement.value.relatedProjectName || ''
-    form.relatedOrderId = currentAchievement.value.relatedOrderId || ''
-    form.relatedOrderName = currentAchievement.value.relatedOrderName || ''
-    form.acceptanceRequirements = currentAchievement.value.acceptanceRequirements || ''
-    form.achievementTarget = currentAchievement.value.achievementTarget || ''
-    form.plannedAcceptanceDate = currentAchievement.value.plannedAcceptanceDate || ''
-    form.estimatedAcceptanceMonth = currentAchievement.value.estimatedAcceptanceMonth || ''
-    form.acceptanceMethod = currentAchievement.value.acceptanceMethod || ''
-    form.acceptor = currentAchievement.value.acceptor || ''
-    form.acceptanceOrganization = currentAchievement.value.acceptanceOrganization || ''
-    form.functionListFile = currentAchievement.value.functionListFile || ''
-    form.packageIds = currentAchievement.value.packageIds || ''
+    const res = currentAchievement.value
+    form.version = res.version || ''
+    form.productName = (res.productName ? res.productName + '（' + res.productId + '）' : '') || ''
+    form.achievementForm = res.achievementForm || ''
+    form.saleType = res.saleType || ''
+    form.hasBaseline = res.hasBaseline || ''
+    form.requirementProposer = res.requirementProposer || ''
+    form.owner = res.owner || ''
+    form.organizationName = res.organizationName || ''
+    form.departmentName = res.departmentName || ''
+    form.moduleId = res.moduleId || ''
+    form.moduleName = res.moduleName || ''
+    form.relatedProjectId = res.relatedProjectId || ''
+    form.relatedProjectName = res.relatedProjectName || ''
+    form.relatedOrderId = res.relatedOrderId || ''
+    form.relatedOrderName = res.relatedOrderName || ''
+    form.achievementTarget = res.achievementTarget || ''
+    form.plannedAcceptanceDate = res.plannedAcceptanceDate || ''
+    form.acceptanceMethod = res.acceptanceMethod || ''
+    form.acceptor = res.acceptor || ''
+    form.functionListFile = res.functionListFile || ''
+    form.packageIds = res.packageIds || ''
     form.changeDescription = ''
   }
 }
