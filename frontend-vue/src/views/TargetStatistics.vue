@@ -33,7 +33,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="细分目标">
-          <el-select v-model="filterForm.subCategory" placeholder="全部细分目标" clearable @change="handleFilterChange">
+          <el-select v-model="filterForm.subCategories" placeholder="全部细分目标" clearable multiple collapse-tags collapse-tags-tooltip @change="handleFilterChange">
             <el-option v-for="item in subCategoryFilterOptions" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
@@ -230,6 +230,7 @@
         stripe
         border
         style="width: 100%"
+        max-height="68vh"
       >
         <el-table-column prop="departmentName" label="部门" min-width="120" fixed />
         <el-table-column prop="organizationName" label="机构" min-width="150" fixed />
@@ -427,7 +428,7 @@ const filterForm = ref({
   organizations: [],
   owner: '',
   status: '',
-  subCategory: ''
+  subCategories: []
 })
 
 // 筛选选项
@@ -579,7 +580,7 @@ const loadStatistics = async () => {
       product: filterForm.value.department || undefined,
       organization: filterForm.value.organizations.length > 0 ? filterForm.value.organizations.join(',') : undefined,
       owner: filterForm.value.owner || undefined,
-      subCategory: filterForm.value.subCategory || undefined
+      subCategory: filterForm.value.subCategories.length > 0 ? filterForm.value.subCategories.join(',') : undefined
     }
     const response = await targetApi.getStatistics(params)
     if (response && response.statistics) {
@@ -643,7 +644,7 @@ const loadTableData = async () => {
       product: filterForm.value.department || undefined,
       organization: filterForm.value.organizations.length > 0 ? filterForm.value.organizations.join(',') : undefined,
       owner: filterForm.value.owner || undefined,
-      subCategory: filterForm.value.subCategory || undefined
+      subCategory: filterForm.value.subCategories.length > 0 ? filterForm.value.subCategories.join(',') : undefined
     }
     const response = await targetApi.getStatistics(params)
     if (response && response.statistics) {

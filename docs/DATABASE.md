@@ -7,6 +7,7 @@
 - 完整记录成果的版本变更历史
 - 支持成果的状态变更追踪
 - 支持成果出库管理
+- v2.0 新增签约明细、确权/收入明细、用户权限配置表
 
 ---
 
@@ -96,6 +97,8 @@ CREATE INDEX idx_achievements_module_id ON achievements(module_id);
 CREATE INDEX idx_achievements_status ON achievements(status);
 CREATE INDEX idx_achievements_type ON achievements(type);
 CREATE INDEX idx_achievements_owner ON achievements(owner);
+CREATE INDEX idx_achievements_department_name ON achievements(department_name);
+CREATE INDEX idx_achievements_organization_name ON achievements(organization_name);
 CREATE INDEX idx_achievements_pre_register_time ON achievements(pre_register_time);
 CREATE INDEX idx_achievements_product_external_version ON achievements(product_external_version);
 ```
@@ -203,6 +206,50 @@ CREATE INDEX idx_achievements_product_external_version ON achievements(product_e
 
 ---
 
+### 6. 目标表 (targets)
+
+存储机构/部门年度目标数据，支持按季度拆分目标值和实际值。
+
+#### 字段说明
+
+| 字段名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| id | VARCHAR(50) | 是 | 主键 |
+| department | VARCHAR(100) | 否 | 部门 |
+| organization | VARCHAR(100) | 否 | 机构 |
+| category | VARCHAR(50) | 否 | 科目（价值/费用） |
+| sub_category | VARCHAR(50) | 否 | 细分目标（签约收入（高/中）、确权收入（高/中）、研发成果、费用） |
+| target_type | VARCHAR(50) | 否 | 目标类型 |
+| year | INTEGER | 否 | 年份 |
+| annual_target | DECIMAL(15,2) | 否 | 年度目标（元） |
+| q1_target | DECIMAL(15,2) | 否 | Q1目标（元） |
+| q2_target | DECIMAL(15,2) | 否 | Q2目标（元） |
+| q3_target | DECIMAL(15,2) | 否 | Q3目标（元） |
+| q4_target | DECIMAL(15,2) | 否 | Q4目标（元） |
+| q1_actual | DECIMAL(15,2) | 否 | Q1实际（元） |
+| q2_actual | DECIMAL(15,2) | 否 | Q2实际（元） |
+| q3_actual | DECIMAL(15,2) | 否 | Q3实际（元） |
+| q4_actual | DECIMAL(15,2) | 否 | Q4实际（元） |
+| owner | VARCHAR(100) | 否 | 负责人 |
+| created_at | TIMESTAMP | 是 | 创建时间 |
+| updated_at | TIMESTAMP | 是 | 更新时间 |
+
+**索引**：
+
+```sql
+CREATE INDEX idx_targets_year ON targets(year);
+CREATE INDEX idx_targets_organization ON targets(organization);
+CREATE INDEX idx_targets_department ON targets(department);
+CREATE INDEX idx_targets_sub_category ON targets(sub_category);
+```
+
+**数据说明**：
+- 签约收入/确权收入/费用的**年度实际** = Q1实际 + Q2实际 + Q3实际 + Q4实际（用户编辑后的汇总）
+- 研发成果的**年度实际**实时从 achievements 表统计（状态为 RECORDED 且已验收的成果数）
+- 前端展示时金额类除以 10000 转换万元，研发成果保持原值（个）
+
+---
+
 ## 表关系图
 
 ```
@@ -233,7 +280,6 @@ CREATE INDEX idx_achievements_product_external_version ON achievements(product_e
 ```
 
 ---
-
 ## 状态流转
 
 ```
@@ -269,3 +315,86 @@ CREATE INDEX idx_achievements_product_external_version ON achievements(product_e
 3. **JSON字段**: `package_ids`、`risk_tags`、`changed_fields` 使用JSON存储数组或对象
 4. **时间字段**: 所有时间字段使用带时区的TIMESTAMP类型
 5. **外键约束**: 删除成果时会级联删除相关的状态记录、版本记录等
+
+---
+
+## v2.0 新增表
+
+### 8. 签约明细表 `contract_signings`
+
+| 列名 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | VARCHAR(50) PK | 是 | UUID 主键 |
+| contract_id | VARCHAR(100) | 否 | 合同ID |
+| contract_name | VARCHAR(200) | 否 | 合同名称 |
+| order_id | VARCHAR(100) | 否 | 订单ID |
+| lead_id | VARCHAR(100) | 否 | 关联线索ID |
+| package_id | VARCHAR(100) | 否 | 产品套餐ID |
+| customer_name | VARCHAR(200) | 否 | 关联客户 |
+| amount | DECIMAL(15,2) | 否 | 签约金额(元) |
+| accounting_type | VARCHAR(50) | 否 | 合同核算类型 |
+| signing_risk_level | VARCHAR(50) | 否 | 签约风险等级（高/中/低） |
+| recognition_risk_level | VARCHAR(50) | 否 | 确权风险等级 |
+| sub_category | VARCHAR(50) | 否 | 细分目标，自动推导（签约收入（高）/ 签约收入（中）） |
+| operator | VARCHAR(100) | 否 | 经营岗 |
+| remark | TEXT | 否 | 备注 |
+| region | VARCHAR(100) | 否 | 所属分区 |
+| product_id | VARCHAR(100) | 否 | 产品ID |
+| organization | VARCHAR(100) | 是 | 所属机构（统计聚合维度） |
+| sign_month | VARCHAR(10) | 否 | 签约归属年月，YYYY-MM |
+| quarter | INT | 否 | 季度 1-4（自动计算） |
+| year | INT | 否 | 年度（自动计算） |
+| created_at | DATETIME | 是 | 创建时间 |
+| updated_at | DATETIME | 是 | 更新时间 |
+
+**索引**: `contract_id` + `package_id`（去重键）, `organization`, `sign_month`, `sub_category`
+
+### 9. 确权/收入明细表 `revenue_recognitions`
+
+| 列名 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | VARCHAR(50) PK | 是 | UUID 主键 |
+| order_id | VARCHAR(100) | 否 | 订单ID |
+| contract_id | VARCHAR(100) | 否 | 关联合同ID |
+| contract_name | VARCHAR(200) | 否 | 关联合同名称 |
+| recognition_amount | DECIMAL(15,2) | 否 | 确权金额(元)，税前 |
+| revenue_amount | DECIMAL(15,2) | 否 | 收入金额(元)，含税（确权金额+税金） |
+| recognition_month | VARCHAR(10) | 否 | 确权归属年月，YYYY-MM |
+| recognition_risk_level | VARCHAR(50) | 否 | 确权风险等级（高/中/低） |
+| sub_category | VARCHAR(50) | 否 | 细分目标，自动推导（确权收入（高）/ 确权收入（中）） |
+| customer_name | VARCHAR(200) | 否 | 关联客户 |
+| operator | VARCHAR(100) | 否 | 经营岗 |
+| remark | TEXT | 否 | 备注 |
+| organization | VARCHAR(100) | 是 | 所属机构（统计聚合维度） |
+| quarter | INT | 否 | 季度 1-4（自动计算） |
+| year | INT | 否 | 年度（自动计算） |
+| created_at | DATETIME | 是 | 创建时间 |
+| updated_at | DATETIME | 是 | 更新时间 |
+
+**索引**: `contract_id` + `order_id`（去重键）, `organization`, `recognition_month`, `sub_category`
+
+### 10. 用户配置表 `user_configs`
+
+| 列名 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | VARCHAR(50) PK | 是 | UUID 主键 |
+| username | VARCHAR(50) UNIQUE | 是 | 用户名 |
+| display_name | VARCHAR(100) | 否 | 显示名称 |
+| role | VARCHAR(20) | 是 | 角色：ADMIN / DEPT_LEADER / ORG_LEADER / USER |
+| department | VARCHAR(100) | 否 | 所属部门 |
+| organization | VARCHAR(100) | 否 | 所属机构 |
+| enabled | INT(1) | 是 | 启用 1/禁用 0 |
+| created_at | DATETIME | 是 | 创建时间 |
+| updated_at | DATETIME | 是 | 更新时间 |
+
+### 目标统计与明细表联动
+
+```
+contract_signings
+  └── SUM(amount) GROUP BY organization, year, quarter, sub_category
+      └── → 签约实际值 (signingActual)
+
+revenue_recognitions
+  └── SUM(revenue_amount) GROUP BY organization, year, quarter, sub_category
+      └── → 确权实际值 (confirmationActual)
+```

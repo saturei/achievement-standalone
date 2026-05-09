@@ -8,12 +8,16 @@ import com.example.achievement.dto.response.StatusRecordResponse;
 import com.example.achievement.dto.response.VersionRecordResponse;
 
 import java.util.List;
+import java.util.Map;
 
 public interface AchievementService {
 
-    AchievementListResponse getAchievements(int page, int pageSize, String status, String achievementForm, 
-                                           String productId, String keyword, Boolean includeDeleted,
-                                           String plannedAcceptanceMonth, String organizationName);
+    AchievementListResponse getAchievements(int page, int pageSize, String keyword, String departmentName,
+                                           String organizationNames, String status,
+                                           String productId, Boolean includeDeleted);
+
+    Map<String, List<String>> getFilteredOptions(String keyword, String departmentName,
+                                                  String organizationNames, String status, String productId);
 
     AchievementStatisticsResponse getStatistics();
 
@@ -38,4 +42,10 @@ public interface AchievementService {
     List<VersionRecordResponse> getVersionRecords(String achievementId);
 
     List<String> getAllOrganizations();
+
+    List<String> getAllDepartments();
+
+    List<String> getAllOwners();
+
+    List<String> getAllTypes();
 }

@@ -19,41 +19,37 @@ public interface AchievementRepository extends JpaRepository<Achievement, String
     List<Achievement> findByAchievementFormNative(@Param("achievementForm") String achievementForm, @Param("limit") int limit, @Param("offset") int offset);
 
     @Query(value = "SELECT * FROM achievements WHERE " +
-           "(:status IS NULL OR status = :status) AND " +
-           "(:achievementForm IS NULL OR achievement_form = :achievementForm) AND " +
-           "(:productId IS NULL OR product_id = :productId) AND " +
            "(:keyword IS NULL OR name LIKE '%' || :keyword || '%' OR description LIKE '%' || :keyword || '%' OR id LIKE '%' || :keyword || '%') AND " +
-           "(:includeDeleted = 1 OR status <> 'DELETED') AND " +
-           "(:plannedAcceptanceMonth IS NULL OR strftime('%Y-%m', planned_acceptance_date) = :plannedAcceptanceMonth) AND " +
-           "(:organizationName IS NULL OR organization_name = :organizationName) " +
+           "(:departmentName IS NULL OR department_name = :departmentName) AND " +
+           "(:organizationNames IS NULL OR ',' || :organizationNames || ',' LIKE '%,' || organization_name || ',%') AND " +
+           "(:status IS NULL OR status = :status) AND " +
+           "(:productId IS NULL OR product_id = :productId) AND " +
+           "(:includeDeleted = 1 OR status <> 'DELETED') " +
            "ORDER BY created_at DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
     List<Achievement> findByConditionsNative(
-            @Param("status") String status,
-            @Param("achievementForm") String achievementForm,
-            @Param("productId") String productId,
             @Param("keyword") String keyword,
+            @Param("departmentName") String departmentName,
+            @Param("organizationNames") String organizationNames,
+            @Param("status") String status,
+            @Param("productId") String productId,
             @Param("includeDeleted") int includeDeleted,
-            @Param("plannedAcceptanceMonth") String plannedAcceptanceMonth,
-            @Param("organizationName") String organizationName,
             @Param("limit") int limit,
             @Param("offset") int offset);
 
     @Query(value = "SELECT COUNT(*) FROM achievements WHERE " +
-           "(:status IS NULL OR status = :status) AND " +
-           "(:achievementForm IS NULL OR achievement_form = :achievementForm) AND " +
-           "(:productId IS NULL OR product_id = :productId) AND " +
            "(:keyword IS NULL OR name LIKE '%' || :keyword || '%' OR description LIKE '%' || :keyword || '%' OR id LIKE '%' || :keyword || '%') AND " +
-           "(:includeDeleted = 1 OR status <> 'DELETED') AND " +
-           "(:plannedAcceptanceMonth IS NULL OR strftime('%Y-%m', planned_acceptance_date) = :plannedAcceptanceMonth) AND " +
-           "(:organizationName IS NULL OR organization_name = :organizationName)", nativeQuery = true)
+           "(:departmentName IS NULL OR department_name = :departmentName) AND " +
+           "(:organizationNames IS NULL OR ',' || :organizationNames || ',' LIKE '%,' || organization_name || ',%') AND " +
+           "(:status IS NULL OR status = :status) AND " +
+           "(:productId IS NULL OR product_id = :productId) AND " +
+           "(:includeDeleted = 1 OR status <> 'DELETED')", nativeQuery = true)
     long countByConditionsNative(
-            @Param("status") String status,
-            @Param("achievementForm") String achievementForm,
-            @Param("productId") String productId,
             @Param("keyword") String keyword,
-            @Param("includeDeleted") int includeDeleted,
-            @Param("plannedAcceptanceMonth") String plannedAcceptanceMonth,
-            @Param("organizationName") String organizationName);
+            @Param("departmentName") String departmentName,
+            @Param("organizationNames") String organizationNames,
+            @Param("status") String status,
+            @Param("productId") String productId,
+            @Param("includeDeleted") int includeDeleted);
 
     List<Achievement> findByNameAndProductExternalVersionOrderByCreatedAtDesc(
             String name, String productExternalVersion);
@@ -72,4 +68,39 @@ public interface AchievementRepository extends JpaRepository<Achievement, String
 
     @Query(value = "SELECT DISTINCT organization_name FROM achievements WHERE organization_name IS NOT NULL AND organization_name <> '' AND status <> 'DELETED' ORDER BY organization_name", nativeQuery = true)
     List<String> findDistinctOrganizationNames();
+
+    @Query(value = "SELECT DISTINCT department_name FROM achievements WHERE department_name IS NOT NULL AND department_name <> '' AND status <> 'DELETED' ORDER BY department_name", nativeQuery = true)
+    List<String> findDistinctDepartmentNames();
+
+    @Query(value = "SELECT DISTINCT department_name FROM achievements WHERE " +
+           "(:keyword IS NULL OR name LIKE '%' || :keyword || '%' OR description LIKE '%' || :keyword || '%' OR id LIKE '%' || :keyword || '%') AND " +
+           "(:organizationNames IS NULL OR ',' || :organizationNames || ',' LIKE '%,' || organization_name || ',%') AND " +
+           "(:status IS NULL OR status = :status) AND " +
+           "(:productId IS NULL OR product_id = :productId) AND " +
+           "status <> 'DELETED' AND department_name IS NOT NULL AND department_name <> '' " +
+           "ORDER BY department_name", nativeQuery = true)
+    List<String> findDistinctDepartmentNamesFiltered(
+            @Param("keyword") String keyword,
+            @Param("organizationNames") String organizationNames,
+            @Param("status") String status,
+            @Param("productId") String productId);
+
+    @Query(value = "SELECT DISTINCT organization_name FROM achievements WHERE " +
+           "(:keyword IS NULL OR name LIKE '%' || :keyword || '%' OR description LIKE '%' || :keyword || '%' OR id LIKE '%' || :keyword || '%') AND " +
+           "(:departmentName IS NULL OR department_name = :departmentName) AND " +
+           "(:status IS NULL OR status = :status) AND " +
+           "(:productId IS NULL OR product_id = :productId) AND " +
+           "status <> 'DELETED' AND organization_name IS NOT NULL AND organization_name <> '' " +
+           "ORDER BY organization_name", nativeQuery = true)
+    List<String> findDistinctOrganizationNamesFiltered(
+            @Param("keyword") String keyword,
+            @Param("departmentName") String departmentName,
+            @Param("status") String status,
+            @Param("productId") String productId);
+
+    @Query(value = "SELECT DISTINCT owner FROM achievements WHERE owner IS NOT NULL AND owner <> '' AND status <> 'DELETED' ORDER BY owner", nativeQuery = true)
+    List<String> findDistinctOwners();
+
+    @Query(value = "SELECT DISTINCT type FROM achievements WHERE type IS NOT NULL AND type <> '' AND status <> 'DELETED' ORDER BY type", nativeQuery = true)
+    List<String> findDistinctTypes();
 }

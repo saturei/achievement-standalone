@@ -4,14 +4,11 @@ import com.example.achievement.dto.request.ActualDataRequest;
 import com.example.achievement.dto.request.CreateTargetRequest;
 import com.example.achievement.dto.response.MonthlyDistributionResponse;
 import com.example.achievement.dto.response.TargetStatisticsResponse;
-import com.example.achievement.entity.ActualData;
-import com.example.achievement.entity.Achievement;
-import com.example.achievement.entity.Target;
+import com.example.achievement.entity.*;
 import com.example.achievement.enums.AchievementStatus;
-import com.example.achievement.repository.ActualDataRepository;
-import com.example.achievement.repository.AchievementRepository;
-import com.example.achievement.repository.TargetRepository;
+import com.example.achievement.repository.*;
 import com.example.achievement.service.TargetService;
+import com.example.achievement.util.UserContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -37,6 +34,9 @@ public class TargetServiceImpl implements TargetService {
     private final TargetRepository targetRepository;
     private final ActualDataRepository actualDataRepository;
     private final AchievementRepository achievementRepository;
+    private final ContractSigningRepository signingRepository;
+    private final RevenueRecognitionRepository recognitionRepository;
+    private final UserConfigRepository userConfigRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @Override
@@ -92,11 +92,57 @@ public class TargetServiceImpl implements TargetService {
                 log.info("After owner filter: {} targets", targets.size());
             }
             if (subCategory != null && !subCategory.isEmpty()) {
+                Set<String> subSet = new HashSet<>(Arrays.asList(subCategory.split(",")));
                 targets = targets.stream()
-                        .filter(t -> subCategory.equals(t.getSubCategory()))
+                        .filter(t -> subSet.contains(t.getSubCategory()))
                         .collect(Collectors.toList());
                 log.info("After subCategory filter: {} targets", targets.size());
             }
+        }
+
+        // 权限过滤：根据当前用户过滤可见数据
+        String currentUser = UserContext.get();
+        if (currentUser != null && !currentUser.isEmpty() && !"admin".equals(currentUser)) {
+            UserConfig userConfig = userConfigRepository.findByUsername(currentUser).orElse(null);
+            if (userConfig != null) {
+                if ("DEPT_LEADER".equals(userConfig.getRole())) {
+                    String dept = userConfig.getDepartment();
+                    targets = targets.stream()
+                            .filter(t -> dept != null && dept.equals(t.getDepartment()))
+                            .collect(Collectors.toList());
+                } else if ("ORG_LEADER".equals(userConfig.getRole())) {
+                    String org = userConfig.getOrganization();
+                    targets = targets.stream()
+                            .filter(t -> org != null && org.equals(t.getOrganization()))
+                            .collect(Collectors.toList());
+                } else if ("USER".equals(userConfig.getRole())) {
+                    targets = targets.stream()
+                            .filter(t -> currentUser.equals(t.getOwner()))
+                            .collect(Collectors.toList());
+                }
+            }
+        }
+
+        // 预加载明细聚合数据
+        Map<String, BigDecimal> signingMap = new HashMap<>();
+        Map<String, BigDecimal> recognitionMap = new HashMap<>();
+        Map<String, BigDecimal> revenueMap = new HashMap<>();
+        try {
+            List<Object[]> signingSums = signingRepository.sumAmountByOrgYearQuarter();
+            for (Object[] row : signingSums) {
+                String key = row[0] + "_" + row[1] + "_" + row[2] + "_" + row[3];
+                signingMap.put(key, row[4] != null ? new BigDecimal(row[4].toString()) : BigDecimal.ZERO);
+            }
+            List<Object[]> recSums = recognitionRepository.sumAmountsByOrgYearQuarter();
+            for (Object[] row : recSums) {
+                String key = row[0] + "_" + row[1] + "_" + row[2] + "_" + row[3];
+                recognitionMap.put(key, row[4] != null ? new BigDecimal(row[4].toString()) : BigDecimal.ZERO);
+                revenueMap.put(key, row[5] != null ? new BigDecimal(row[5].toString()) : BigDecimal.ZERO);
+            }
+        } catch (Exception e) {
+            System.out.println("========== DEBUG 加载明细聚合数据失败: " + e.getMessage());
+            e.printStackTrace();
+            log.warn("加载明细聚合数据失败: {}", e.getMessage());
         }
         
         if (targets.isEmpty()) {
@@ -149,29 +195,38 @@ public class TargetServiceImpl implements TargetService {
             
             if (subCategoryName.contains("签约")) {
                 signingTarget = target.getAnnualTarget() != null ? target.getAnnualTarget() : BigDecimal.ZERO;
-                BigDecimal q1a = target.getQ1Actual() != null ? target.getQ1Actual() : BigDecimal.ZERO;
-                BigDecimal q2a = target.getQ2Actual() != null ? target.getQ2Actual() : BigDecimal.ZERO;
-                BigDecimal q3a = target.getQ3Actual() != null ? target.getQ3Actual() : BigDecimal.ZERO;
-                BigDecimal q4a = target.getQ4Actual() != null ? target.getQ4Actual() : BigDecimal.ZERO;
-                signingActual = q1a.add(q2a).add(q3a).add(q4a);
+                // 优先从签约明细聚合取实际值（按机构+年度+季度+细分目标匹配）
+                BigDecimal detailSigning = BigDecimal.ZERO;
+                for (int q = 1; q <= 4; q++) {
+                    String key = organizationName + "_" + year + "_" + q + "_" + subCategoryName;
+                    BigDecimal val = signingMap.get(key);
+                    if (val != null) detailSigning = detailSigning.add(val);
+                }
+                if (detailSigning.compareTo(BigDecimal.ZERO) > 0) {
+                    signingActual = detailSigning;
+                } else {
+                    signingActual = q1a(target).add(q2a(target)).add(q3a(target)).add(q4a(target));
+                }
             } else if (subCategoryName.contains("确权")) {
                 confirmationTarget = target.getAnnualTarget() != null ? target.getAnnualTarget() : BigDecimal.ZERO;
-                BigDecimal q1a = target.getQ1Actual() != null ? target.getQ1Actual() : BigDecimal.ZERO;
-                BigDecimal q2a = target.getQ2Actual() != null ? target.getQ2Actual() : BigDecimal.ZERO;
-                BigDecimal q3a = target.getQ3Actual() != null ? target.getQ3Actual() : BigDecimal.ZERO;
-                BigDecimal q4a = target.getQ4Actual() != null ? target.getQ4Actual() : BigDecimal.ZERO;
-                confirmationActual = q1a.add(q2a).add(q3a).add(q4a);
+                BigDecimal detailRev = BigDecimal.ZERO;
+                for (int q = 1; q <= 4; q++) {
+                    String key = organizationName + "_" + year + "_" + q + "_" + subCategoryName;
+                    BigDecimal val = revenueMap.get(key);
+                    if (val != null) detailRev = detailRev.add(val);
+                }
+                if (detailRev.compareTo(BigDecimal.ZERO) > 0) {
+                    confirmationActual = detailRev;
+                } else {
+                    confirmationActual = q1a(target).add(q2a(target)).add(q3a(target)).add(q4a(target));
+                }
             } else if ("研发成果".equals(subCategoryName)) {
                 rdActual = calculateRdActualForOrganization(organizationName, year);
                 rdPlanned = calculateRdPlannedForOrganization(organizationName, year);
                 rdTarget = rdActual + rdPlanned;
             } else if ("费用".equals(subCategoryName)) {
                 budgetTarget = target.getAnnualTarget() != null ? target.getAnnualTarget() : BigDecimal.ZERO;
-                BigDecimal q1a = target.getQ1Actual() != null ? target.getQ1Actual() : BigDecimal.ZERO;
-                BigDecimal q2a = target.getQ2Actual() != null ? target.getQ2Actual() : BigDecimal.ZERO;
-                BigDecimal q3a = target.getQ3Actual() != null ? target.getQ3Actual() : BigDecimal.ZERO;
-                BigDecimal q4a = target.getQ4Actual() != null ? target.getQ4Actual() : BigDecimal.ZERO;
-                budgetActual = q1a.add(q2a).add(q3a).add(q4a);
+                budgetActual = q1a(target).add(q2a(target)).add(q3a(target)).add(q4a(target));
             }
             
             BigDecimal dimensionTarget = signingTarget.add(confirmationTarget).add(budgetTarget);
@@ -218,15 +273,15 @@ public class TargetServiceImpl implements TargetService {
                             : (target.getAnnualTarget() != null ? target.getAnnualTarget() : BigDecimal.ZERO))
                     .actualValue("研发成果".equals(subCategoryName)
                             ? new BigDecimal(rdActual)
-                            : BigDecimal.ZERO)
+                            : signingActual.add(confirmationActual).add(budgetActual))
                     .q1Target(target.getQ1Target() != null ? target.getQ1Target() : BigDecimal.ZERO)
                     .q2Target(target.getQ2Target() != null ? target.getQ2Target() : BigDecimal.ZERO)
                     .q3Target(target.getQ3Target() != null ? target.getQ3Target() : BigDecimal.ZERO)
                     .q4Target(target.getQ4Target() != null ? target.getQ4Target() : BigDecimal.ZERO)
-                    .q1Actual(target.getQ1Actual() != null ? target.getQ1Actual() : BigDecimal.ZERO)
-                    .q2Actual(target.getQ2Actual() != null ? target.getQ2Actual() : BigDecimal.ZERO)
-                    .q3Actual(target.getQ3Actual() != null ? target.getQ3Actual() : BigDecimal.ZERO)
-                    .q4Actual(target.getQ4Actual() != null ? target.getQ4Actual() : BigDecimal.ZERO)
+                    .q1Actual(detailQuarterActual(organizationName, year, 1, signingMap, recognitionMap, revenueMap, subCategoryName, target))
+                    .q2Actual(detailQuarterActual(organizationName, year, 2, signingMap, recognitionMap, revenueMap, subCategoryName, target))
+                    .q3Actual(detailQuarterActual(organizationName, year, 3, signingMap, recognitionMap, revenueMap, subCategoryName, target))
+                    .q4Actual(detailQuarterActual(organizationName, year, 4, signingMap, recognitionMap, revenueMap, subCategoryName, target))
                     .build());
             
             totalTarget = totalTarget.add(dimensionTarget);
@@ -921,5 +976,40 @@ public class TargetServiceImpl implements TargetService {
         Integer sqlCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM targets WHERE year=2026", Integer.class);
         Integer totalCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM targets", Integer.class);
         return String.format("JPA count: %d, SQL count for 2026: %d, Total SQL count: %d", jpaCount, sqlCount, totalCount);
+    }
+
+    private static BigDecimal q1a(Target t) { return t.getQ1Actual() != null ? t.getQ1Actual() : BigDecimal.ZERO; }
+    private static BigDecimal q2a(Target t) { return t.getQ2Actual() != null ? t.getQ2Actual() : BigDecimal.ZERO; }
+    private static BigDecimal q3a(Target t) { return t.getQ3Actual() != null ? t.getQ3Actual() : BigDecimal.ZERO; }
+    private static BigDecimal q4a(Target t) { return t.getQ4Actual() != null ? t.getQ4Actual() : BigDecimal.ZERO; }
+
+    private BigDecimal detailQuarterActual(String org, int year, int quarter,
+            Map<String, BigDecimal> signingMap, Map<String, BigDecimal> recognitionMap,
+            Map<String, BigDecimal> revenueMap, String subCategory, Target target) {
+        String key = org + "_" + year + "_" + quarter + "_" + subCategory;
+        BigDecimal fallback = qActual(target, quarter);
+        if (subCategory.contains("签约")) {
+            BigDecimal val = signingMap.get(key);
+            return val != null ? val : fallback;
+        }
+        if (subCategory.contains("确权")) {
+            BigDecimal val = revenueMap.get(key);
+            return val != null ? val : fallback;
+        }
+        if ("费用".equals(subCategory)) {
+            return fallback;
+        }
+        return fallback;
+    }
+
+    private static BigDecimal qActual(Target t, int quarter) {
+        BigDecimal val = null;
+        switch (quarter) {
+            case 1: val = t.getQ1Actual(); break;
+            case 2: val = t.getQ2Actual(); break;
+            case 3: val = t.getQ3Actual(); break;
+            case 4: val = t.getQ4Actual(); break;
+        }
+        return val != null ? val : BigDecimal.ZERO;
     }
 }

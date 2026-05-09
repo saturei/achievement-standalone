@@ -46,6 +46,21 @@ const routes = [
     path: '/target-edit',
     name: 'TargetEdit',
     component: () => import('../views/TargetEdit.vue')
+  },
+  {
+    path: '/user-management',
+    name: 'UserManagement',
+    component: () => import('../views/UserManagement.vue')
+  },
+  {
+    path: '/contract-signings',
+    name: 'ContractSignings',
+    component: () => import('../views/SigningDetail.vue')
+  },
+  {
+    path: '/revenue-recognitions',
+    name: 'RevenueRecognitions',
+    component: () => import('../views/RecognitionDetail.vue')
   }
 ]
 

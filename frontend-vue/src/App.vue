@@ -14,6 +14,41 @@
             <el-menu-item index="/">成果列表</el-menu-item>
             <el-menu-item index="/pre-register">预注册</el-menu-item>
           </el-menu>
+          <div class="header-right">
+            <el-select
+              v-model="currentUser"
+              placeholder="选择当前用户"
+              size="small"
+              style="width: 160px; margin-right: 12px"
+              @change="handleUserChange"
+            >
+              <el-option
+                v-for="u in userList"
+                :key="u.username"
+                :label="u.displayName + ' (' + roleLabel(u.role) + ')'"
+                :value="u.username"
+              />
+            </el-select>
+            <el-dropdown trigger="click">
+              <el-button size="small" type="info" plain>
+                管理
+                <el-icon><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="router.push('/user-management')">
+                    <el-icon><User /></el-icon> 用户管理
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/contract-signings')">
+                    <el-icon><Document /></el-icon> 签约明细
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/revenue-recognitions')">
+                    <el-icon><Money /></el-icon> 确权/收入明细
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
         </div>
       </el-header>
       <el-main>
@@ -24,11 +59,47 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowDown, User, Document, Money } from '@element-plus/icons-vue'
+import axios from 'axios'
 
 const route = useRoute()
+const router = useRouter()
 const activeMenu = computed(() => route.path)
+const currentUser = ref('admin')
+const userList = ref([{ username: 'admin', displayName: '管理员', role: 'ADMIN' }])
+
+onMounted(async () => {
+  try {
+    const res = await axios.get('/api/users')
+    if (res.data) {
+      userList.value = res.data
+    }
+  } catch (e) {
+    console.error('加载用户列表失败:', e)
+  }
+  const stored = localStorage.getItem('currentUser')
+  if (stored) {
+    try {
+      const u = JSON.parse(stored)
+      currentUser.value = u.username
+    } catch (e) {}
+  }
+})
+
+const handleUserChange = (val) => {
+  const user = userList.value.find(u => u.username === val)
+  if (user) {
+    localStorage.setItem('currentUser', JSON.stringify(user))
+    window.location.reload()
+  }
+}
+
+const roleLabel = (role) => {
+  const m = { ADMIN: '管理员', DEPT_LEADER: '部门负责人', ORG_LEADER: '机构负责人', USER: '普通用户' }
+  return m[role] || role
+}
 </script>
 
 <style>
@@ -56,7 +127,8 @@ const activeMenu = computed(() => route.path)
 .header-content h1 {
   margin: 0;
   font-size: 20px;
-  margin-right: 40px;
+  margin-right: 30px;
+  white-space: nowrap;
 }
 
 .header-menu {
@@ -79,9 +151,25 @@ const activeMenu = computed(() => route.path)
   border-bottom: 2px solid #409eff;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .el-main {
   padding: 20px;
   background-color: #f5f5f5;
   min-height: calc(100vh - 60px);
+}
+
+/* ---- 全局表格样式 ---- */
+.el-table th .cell,
+.el-table td .cell {
+  text-align: center;
+}
+/* 数值列右对齐覆盖 */
+.el-table .el-table-column--align-right .cell {
+  text-align: right;
 }
 </style>

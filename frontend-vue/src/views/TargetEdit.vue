@@ -107,7 +107,7 @@
           <span>历史记录</span>
         </div>
       </template>
-      <el-table :data="historyData" stripe border style="width: 100%">
+      <el-table :data="historyData" stripe border style="width: 100%" max-height="40vh">
         <el-table-column prop="organizationName" label="机构" width="200" />
         <el-table-column prop="dataType" label="数据类型" width="120">
           <template #default="{ row }">

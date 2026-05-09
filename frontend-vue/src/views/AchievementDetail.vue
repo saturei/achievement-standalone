@@ -109,7 +109,7 @@
       </el-tab-pane>
 
       <el-tab-pane label="变更历史" name="history">
-        <el-table :data="historyList" v-loading="historyLoading" border>
+        <el-table :data="historyList" v-loading="historyLoading" border max-height="40vh">
           <el-table-column prop="changeTime" label="变更时间" width="180">
             <template #default="{ row }">
               {{ formatDateTime(row.changeTime) }}

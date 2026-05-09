@@ -8,7 +8,19 @@ const api = axios.create({
   }
 })
 
-// 响应拦截器
+api.interceptors.request.use(config => {
+  const stored = localStorage.getItem('currentUser')
+  if (stored) {
+    try {
+      const user = JSON.parse(stored)
+      if (user.username) {
+        config.headers['X-Current-User'] = user.username
+      }
+    } catch (e) {}
+  }
+  return config
+})
+
 api.interceptors.response.use(
   response => response.data,
   error => {

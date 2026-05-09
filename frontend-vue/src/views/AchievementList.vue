@@ -1,6 +1,6 @@
 <template>
   <div class="achievement-list">
-    <!-- 搜索栏 -->
+    <!-- 筛选栏 -->
     <el-card class="search-card">
       <el-form :inline="true" :model="searchForm">
         <el-form-item label="关键词">
@@ -8,11 +8,26 @@
             v-model="searchForm.keyword"
             placeholder="搜索成果名称、描述"
             clearable
-            @clear="handleSearch"
+            @change="handleFilterChange"
           />
         </el-form-item>
+        <el-form-item label="部门">
+          <el-select v-model="searchForm.departmentName" placeholder="全部部门" clearable @change="handleDepartmentChange">
+            <el-option v-for="item in departmentOptions" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="机构">
+          <el-select v-model="searchForm.organizationNames" placeholder="全部机构" clearable multiple collapse-tags collapse-tags-tooltip @change="handleFilterChange">
+            <el-option v-for="item in organizationOptions" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="产品">
+          <el-select v-model="searchForm.productId" placeholder="全部产品" clearable @change="handleFilterChange">
+            <el-option v-for="(label, value) in productMap" :key="value" :label="label" :value="value" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="选择状态" clearable>
+          <el-select v-model="searchForm.status" placeholder="全部状态" clearable @change="handleFilterChange">
             <el-option label="预注册" value="pre_register" />
             <el-option label="注册" value="register" />
             <el-option label="登记" value="recorded" />
@@ -20,45 +35,7 @@
             <el-option label="已删除" value="deleted" />
           </el-select>
         </el-form-item>
-        <el-form-item label="成果形态">
-          <el-select v-model="searchForm.achievementForm" placeholder="选择成果形态" clearable>
-            <el-option label="系统成果" value="系统成果" />
-            <el-option label="方案成果" value="方案成果" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="产品">
-          <el-select v-model="searchForm.productId" placeholder="选择产品" clearable>
-            <el-option label="数字化智能营销平台（CP_0001）" value="CP_0001" />
-            <el-option label="对公金融服务平台（CP_0003）" value="CP_0003" />
-            <el-option label="个人金融服务平台（CP_0004）" value="CP_0004" />
-            <el-option label="Finmall平台（CP_0007）" value="CP_0007" />
-            <el-option label="Finmall资产底座（CP_0008）" value="CP_0008" />
-            <el-option label="DPRO平台（CP_0012）" value="CP_0012" />
-            <el-option label="信创产品（CP_0014）" value="CP_0014" />
-            <el-option label="企业服务生态云平台（CP_0018）" value="CP_0018" />
-            <el-option label="AI 手机银行（CP_0019）" value="CP_0019" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="计划验收日期">
-          <el-date-picker
-            v-model="searchForm.plannedAcceptanceMonth"
-            type="month"
-            format="YYYY-MM"
-            value-format="YYYY-MM"
-            placeholder="选择月份"
-            clearable
-          />
-        </el-form-item>
-        <el-form-item label="机构">
-          <el-select v-model="searchForm.organizationName" placeholder="选择机构" clearable>
-            <el-option v-for="item in organizationOptions" :key="item" :label="item" :value="item" />
-          </el-select>
-        </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
           <el-button @click="handleReset">重置</el-button>
           <el-button type="primary" @click="handlePreRegister">预注册</el-button>
         </el-form-item>
@@ -128,6 +105,7 @@
         v-loading="loading"
         stripe
         style="width: 100%"
+        max-height="70vh"
       >
         <el-table-column prop="departmentName" label="部门" min-width="120" />
         <el-table-column prop="organizationName" label="机构" min-width="150" />
@@ -232,6 +210,7 @@ const router = useRouter()
 const loading = ref(false)
 const achievements = ref([])
 const organizationOptions = ref([])
+const departmentOptions = ref([])
 const statistics = ref({
   totalCount: 0,
   preRegisterCount: 0,
@@ -242,11 +221,10 @@ const statistics = ref({
 
 const searchForm = reactive({
   keyword: '',
-  status: '',
-  achievementForm: '',
+  departmentName: '',
+  organizationNames: [],
   productId: '',
-  plannedAcceptanceMonth: '',
-  organizationName: ''
+  status: ''
 })
 
 const productMap = {
@@ -276,8 +254,24 @@ const pagination = reactive({
 onMounted(() => {
   loadStatistics()
   loadAchievements()
-  loadOrganizationOptions()
+  loadFilterOptions()
 })
+
+const loadFilterOptions = async () => {
+  try {
+    const params = {}
+    if (searchForm.keyword) params.keyword = searchForm.keyword
+    if (searchForm.departmentName) params.departmentName = searchForm.departmentName
+    if (searchForm.organizationNames.length > 0) params.organizationNames = searchForm.organizationNames.join(',')
+    if (searchForm.status) params.status = searchForm.status
+    if (searchForm.productId) params.productId = searchForm.productId
+    const data = await achievementApi.getFilterOptions(params)
+    departmentOptions.value = data.departments || []
+    organizationOptions.value = data.organizations || []
+  } catch (error) {
+    console.error('加载筛选选项失败:', error)
+  }
+}
 
 const loadStatistics = async () => {
   try {
@@ -291,11 +285,16 @@ const loadStatistics = async () => {
 const loadAchievements = async () => {
   loading.value = true
   try {
-    const data = await achievementApi.getAchievements({
+    const params = {
       page: pagination.page,
-      pageSize: pagination.pageSize,
-      ...searchForm
-    })
+      pageSize: pagination.pageSize
+    }
+    if (searchForm.keyword) params.keyword = searchForm.keyword
+    if (searchForm.departmentName) params.departmentName = searchForm.departmentName
+    if (searchForm.organizationNames.length > 0) params.organizationNames = searchForm.organizationNames.join(',')
+    if (searchForm.status) params.status = searchForm.status
+    if (searchForm.productId) params.productId = searchForm.productId
+    const data = await achievementApi.getAchievements(params)
     achievements.value = data.items
     pagination.total = data.total
   } catch (error) {
@@ -305,9 +304,24 @@ const loadAchievements = async () => {
   }
 }
 
-const handleSearch = () => {
+const handleFilterChange = () => {
   pagination.page = 1
   loadAchievements()
+  loadFilterOptions()
+}
+
+const handleDepartmentChange = () => {
+  searchForm.organizationNames = []
+  handleFilterChange()
+}
+
+const handleReset = () => {
+  searchForm.keyword = ''
+  searchForm.departmentName = ''
+  searchForm.organizationNames = []
+  searchForm.productId = ''
+  searchForm.status = ''
+  handleFilterChange()
 }
 
 const handlePageChange = () => {
@@ -317,16 +331,6 @@ const handlePageChange = () => {
 const handlePageSizeChange = () => {
   pagination.page = 1
   loadAchievements()
-}
-
-const handleReset = () => {
-  searchForm.keyword = ''
-  searchForm.status = ''
-  searchForm.achievementForm = ''
-  searchForm.productId = ''
-  searchForm.plannedAcceptanceMonth = ''
-  searchForm.organizationName = ''
-  handleSearch()
 }
 
 const viewDetail = (id) => {
@@ -406,15 +410,6 @@ const formatDate = (dateStr) => {
 
 const handlePreRegister = () => {
   router.push('/pre-register')
-}
-
-const loadOrganizationOptions = async () => {
-  try {
-    const data = await achievementApi.getOrganizations()
-    organizationOptions.value = data
-  } catch (error) {
-    console.error('加载机构列表失败:', error)
-  }
 }
 </script>
 

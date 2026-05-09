@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/achievements")
@@ -29,15 +30,14 @@ public class AchievementController {
     public ResponseEntity<AchievementListResponse> getAchievements(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String achievementForm,
-            @RequestParam(required = false) String productId,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Boolean includeDeleted,
-            @RequestParam(required = false) String plannedAcceptanceMonth,
-            @RequestParam(required = false) String organizationName) {
+            @RequestParam(required = false) String departmentName,
+            @RequestParam(required = false) String organizationNames,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String productId,
+            @RequestParam(required = false) Boolean includeDeleted) {
         return ResponseEntity.ok(achievementService.getAchievements(
-                page, pageSize, status, achievementForm, productId, keyword, includeDeleted, plannedAcceptanceMonth, organizationName));
+                page, pageSize, keyword, departmentName, organizationNames, status, productId, includeDeleted));
     }
 
     @GetMapping("/statistics")
@@ -118,5 +118,35 @@ public class AchievementController {
     @Operation(summary = "获取所有机构列表")
     public ResponseEntity<List<String>> getAllOrganizations() {
         return ResponseEntity.ok(achievementService.getAllOrganizations());
+    }
+
+    @GetMapping("/departments")
+    @Operation(summary = "获取所有部门列表")
+    public ResponseEntity<List<String>> getAllDepartments() {
+        return ResponseEntity.ok(achievementService.getAllDepartments());
+    }
+
+    @GetMapping("/owners")
+    @Operation(summary = "获取所有负责人列表")
+    public ResponseEntity<List<String>> getAllOwners() {
+        return ResponseEntity.ok(achievementService.getAllOwners());
+    }
+
+    @GetMapping("/types")
+    @Operation(summary = "获取所有类型列表")
+    public ResponseEntity<List<String>> getAllTypes() {
+        return ResponseEntity.ok(achievementService.getAllTypes());
+    }
+
+    @GetMapping("/filter-options")
+    @Operation(summary = "根据当前筛选获取可选部门和机构")
+    public ResponseEntity<Map<String, List<String>>> getFilteredOptions(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String departmentName,
+            @RequestParam(required = false) String organizationNames,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String productId) {
+        return ResponseEntity.ok(achievementService.getFilteredOptions(
+                keyword, departmentName, organizationNames, status, productId));
     }
 }

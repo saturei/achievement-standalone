@@ -48,9 +48,9 @@ public class AchievementServiceImpl implements AchievementService {
 
     @Override
     @Transactional(readOnly = true)
-    public AchievementListResponse getAchievements(int page, int pageSize, String status, String achievementForm,
-                                                   String productId, String keyword, Boolean includeDeleted,
-                                                   String plannedAcceptanceMonth, String organizationName) {
+    public AchievementListResponse getAchievements(int page, int pageSize, String keyword, String departmentName,
+                                                   String organizationNames, String status,
+                                                   String productId, Boolean includeDeleted) {
         int offset = (page - 1) * pageSize;
         
         String statusStr = null;
@@ -71,17 +71,18 @@ public class AchievementServiceImpl implements AchievementService {
             includeDeletedFlag = 0;
         }
         
-        String formParam = (achievementForm != null && !achievementForm.trim().isEmpty()) ? achievementForm : null;
-        String productIdParam = (productId != null && !productId.trim().isEmpty()) ? productId : null;
         String keywordParam = (keyword != null && !keyword.trim().isEmpty()) ? keyword : null;
-        String plannedAcceptanceMonthParam = (plannedAcceptanceMonth != null && !plannedAcceptanceMonth.trim().isEmpty()) ? plannedAcceptanceMonth : null;
-        String organizationNameParam = (organizationName != null && !organizationName.trim().isEmpty()) ? organizationName : null;
+        String departmentNameParam = (departmentName != null && !departmentName.trim().isEmpty()) ? departmentName : null;
+        String organizationNamesParam = (organizationNames != null && !organizationNames.trim().isEmpty()) ? organizationNames : null;
+        String productIdParam = (productId != null && !productId.trim().isEmpty()) ? productId : null;
         
         List<Achievement> achievements = achievementRepository.findByConditionsNative(
-                statusStr, formParam, productIdParam, keywordParam, includeDeletedFlag, plannedAcceptanceMonthParam, organizationNameParam, pageSize, offset);
+                keywordParam, departmentNameParam, organizationNamesParam, statusStr,
+                productIdParam, includeDeletedFlag, pageSize, offset);
 
         long total = achievementRepository.countByConditionsNative(
-                statusStr, formParam, productIdParam, keywordParam, includeDeletedFlag, plannedAcceptanceMonthParam, organizationNameParam);
+                keywordParam, departmentNameParam, organizationNamesParam, statusStr,
+                productIdParam, includeDeletedFlag);
 
         List<AchievementResponse> items = achievements.stream()
                 .map(this::convertToResponse)
@@ -582,5 +583,52 @@ public class AchievementServiceImpl implements AchievementService {
     @Transactional(readOnly = true)
     public List<String> getAllOrganizations() {
         return achievementRepository.findDistinctOrganizationNames();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> getAllDepartments() {
+        return achievementRepository.findDistinctDepartmentNames();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> getAllOwners() {
+        return achievementRepository.findDistinctOwners();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> getAllTypes() {
+        return achievementRepository.findDistinctTypes();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, List<String>> getFilteredOptions(String keyword, String departmentName,
+                                                         String organizationNames, String status, String productId) {
+        String statusStr = null;
+        if (status != null && !status.trim().isEmpty()) {
+            try {
+                statusStr = AchievementStatus.fromCode(status).name();
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid status code: {}", status);
+            }
+        }
+
+        String keywordParam = (keyword != null && !keyword.trim().isEmpty()) ? keyword : null;
+        String departmentNameParam = (departmentName != null && !departmentName.trim().isEmpty()) ? departmentName : null;
+        String organizationNamesParam = (organizationNames != null && !organizationNames.trim().isEmpty()) ? organizationNames : null;
+        String productIdParam = (productId != null && !productId.trim().isEmpty()) ? productId : null;
+
+        List<String> departments = achievementRepository.findDistinctDepartmentNamesFiltered(
+                keywordParam, organizationNamesParam, statusStr, productIdParam);
+        List<String> organizations = achievementRepository.findDistinctOrganizationNamesFiltered(
+                keywordParam, departmentNameParam, statusStr, productIdParam);
+
+        Map<String, List<String>> result = new HashMap<>();
+        result.put("departments", departments);
+        result.put("organizations", organizations);
+        return result;
     }
 }
