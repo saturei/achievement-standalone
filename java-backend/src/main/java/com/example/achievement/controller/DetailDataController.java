@@ -2,8 +2,10 @@ package com.example.achievement.controller;
 
 import com.example.achievement.entity.ContractSigning;
 import com.example.achievement.entity.RevenueRecognition;
+import com.example.achievement.config.DingTalkProperties;
 import com.example.achievement.repository.ContractSigningRepository;
 import com.example.achievement.repository.RevenueRecognitionRepository;
+import com.example.achievement.service.DingTalkSyncService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,6 +22,8 @@ public class DetailDataController {
     private final ContractSigningRepository signingRepository;
     private final RevenueRecognitionRepository recognitionRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final DingTalkSyncService dingTalkSyncService;
+    private final DingTalkProperties dingTalkProperties;
 
     @GetMapping("/signings")
     public ResponseEntity<List<ContractSigning>> getSignings(
@@ -213,5 +217,38 @@ public class DetailDataController {
         result.put("counts", counts);
         result.put("totalUpdated", total);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/dingtalk-status")
+    public ResponseEntity<Map<String, Object>> dingtalkStatus() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("configured", dingTalkProperties.isConfigured());
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/signings/sync-from-dingtalk")
+    public ResponseEntity<Map<String, Object>> syncSigningsFromDingTalk() {
+        if (!dingTalkProperties.isConfigured()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "钉钉未配置"));
+        }
+        try {
+            Map<String, Object> result = dingTalkSyncService.syncSignings();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "钉钉同步失败: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/recognitions/sync-from-dingtalk")
+    public ResponseEntity<Map<String, Object>> syncRecognitionsFromDingTalk() {
+        if (!dingTalkProperties.isConfigured()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "钉钉未配置"));
+        }
+        try {
+            Map<String, Object> result = dingTalkSyncService.syncRecognitions();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "钉钉同步失败: " + e.getMessage()));
+        }
     }
 }

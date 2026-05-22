@@ -5,6 +5,7 @@
         <div class="card-header">
           <span>确权/收入明细管理 — 数据同步至目标统计「确权实际值」和「预算实际值」</span>
           <div>
+            <el-button v-if="dtConfigured" size="small" type="warning" @click="handleSyncFromDingTalk" :loading="syncingFromDingTalk">从钉钉导入</el-button>
             <el-button size="small" @click="handlePaste">粘贴Excel</el-button>
             <el-button size="small" type="primary" @click="handleAdd">新增行</el-button>
             <el-button size="small" type="success" @click="handleSaveAll" :loading="savingAll" :disabled="editingRows.size === 0">
@@ -152,6 +153,8 @@ import axios from 'axios'
 const loading = ref(false)
 const pasting = ref(false)
 const savingAll = ref(false)
+const syncingFromDingTalk = ref(false)
+const dtConfigured = ref(false)
 const pasteVisible = ref(false)
 const pasteText = ref('')
 const pastePreview = ref([])
@@ -167,7 +170,29 @@ const originalRows = ref({})
 onMounted(async () => {
   await loadOrgs()
   loadData()
-})
+  checkDingTalkStatus()
+});
+
+const checkDingTalkStatus = async () => {
+  try {
+    const res = await axios.get('/api/detail/dingtalk-status')
+    dtConfigured.value = res.data?.configured === true
+  } catch (e) { /* ignore */ }
+};
+
+const handleSyncFromDingTalk = async () => {
+  syncingFromDingTalk.value = true
+  try {
+    const res = await axios.post('/api/detail/recognitions/sync-from-dingtalk')
+    const data = res.data
+    ElMessage.success(`钉钉导入完成：成功 ${data.imported} 条，跳过重复 ${data.skipped} 条`)
+    loadData()
+  } catch (e) {
+    ElMessage.error('钉钉导入失败: ' + (e.response?.data?.error || e.message))
+  } finally {
+    syncingFromDingTalk.value = false
+  }
+};
 
 const loadOrgs = async () => {
   try {

@@ -40,3 +40,8 @@ build/
 
 # Trae配置
 .trae/
+
+# 钉钉密钥配置（含AppSecret, 勿提交）
+java-backend/src/main/resources/application-dingtalk.yml
+__pycache__/
+*.pyc
