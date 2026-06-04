@@ -99,14 +99,55 @@ public class AchievementServiceImpl implements AchievementService {
 
     @Override
     @Transactional(readOnly = true)
-    public AchievementStatisticsResponse getStatistics() {
+    public AchievementStatisticsResponse getStatistics(String keyword, String departmentName,
+                                                       String organizationNames, String status,
+                                                       String productId, Boolean includeDeleted) {
+        String statusStr = null;
+        if (status != null && !status.trim().isEmpty()) {
+            try {
+                statusStr = AchievementStatus.fromCode(status).name();
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid status code: {}", status);
+            }
+        }
+
+        int includeDeletedFlag;
+        if ("DELETED".equals(statusStr)) {
+            includeDeletedFlag = 1;
+        } else if (includeDeleted != null && includeDeleted) {
+            includeDeletedFlag = 1;
+        } else {
+            includeDeletedFlag = 0;
+        }
+
+        String keywordParam = (keyword != null && !keyword.trim().isEmpty()) ? keyword : null;
+        String departmentNameParam = (departmentName != null && !departmentName.trim().isEmpty()) ? departmentName : null;
+        String organizationNamesParam = (organizationNames != null && !organizationNames.trim().isEmpty()) ? organizationNames : null;
+        String productIdParam = (productId != null && !productId.trim().isEmpty()) ? productId : null;
+
+        boolean hasFilters = keywordParam != null || departmentNameParam != null
+                || organizationNamesParam != null || productIdParam != null || statusStr != null;
+
         AchievementStatisticsResponse response = new AchievementStatisticsResponse();
-        
-        response.setTotalCount(achievementRepository.countAllExcludingDeleted());
-        response.setPreRegisterCount(achievementRepository.countByStatus("PRE_REGISTER"));
-        response.setRegisterCount(achievementRepository.countByStatus("REGISTER"));
-        response.setRecordCount(achievementRepository.countByStatus("RECORDED"));
-        response.setOfflineCount(achievementRepository.countByStatus("OFFLINE"));
+
+        if (hasFilters) {
+            response.setTotalCount(achievementRepository.countFilteredExcludingDeleted(
+                    keywordParam, departmentNameParam, organizationNamesParam, productIdParam, includeDeletedFlag));
+            response.setPreRegisterCount(achievementRepository.countByStatusWithFilters(
+                    keywordParam, departmentNameParam, organizationNamesParam, productIdParam, includeDeletedFlag, "PRE_REGISTER"));
+            response.setRegisterCount(achievementRepository.countByStatusWithFilters(
+                    keywordParam, departmentNameParam, organizationNamesParam, productIdParam, includeDeletedFlag, "REGISTER"));
+            response.setRecordCount(achievementRepository.countByStatusWithFilters(
+                    keywordParam, departmentNameParam, organizationNamesParam, productIdParam, includeDeletedFlag, "RECORDED"));
+            response.setOfflineCount(achievementRepository.countByStatusWithFilters(
+                    keywordParam, departmentNameParam, organizationNamesParam, productIdParam, includeDeletedFlag, "OFFLINE"));
+        } else {
+            response.setTotalCount(achievementRepository.countAllExcludingDeleted());
+            response.setPreRegisterCount(achievementRepository.countByStatus("PRE_REGISTER"));
+            response.setRegisterCount(achievementRepository.countByStatus("REGISTER"));
+            response.setRecordCount(achievementRepository.countByStatus("RECORDED"));
+            response.setOfflineCount(achievementRepository.countByStatus("OFFLINE"));
+        }
 
         Map<String, Long> byStatus = new HashMap<>();
         byStatus.put("pre_register", response.getPreRegisterCount());

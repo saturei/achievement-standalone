@@ -12,6 +12,7 @@ public class DingTalkProperties {
     private String appKey;
     private String appSecret;
     private String baseId;
+    private String dataWarehouseBaseId;
     private String operatorId;
     private String sheetSignings = "签约明细";
     private String sheetRecognitions = "确权明细";

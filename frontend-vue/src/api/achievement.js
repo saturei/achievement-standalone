@@ -9,8 +9,8 @@ export default {
     return api.get(`/achievements/${id}`)
   },
 
-  getStatistics() {
-    return api.get('/achievements/statistics')
+  getStatistics(params) {
+    return api.get('/achievements/statistics', { params })
   },
 
   preRegister(data) {

@@ -24,10 +24,10 @@ public class ActualData {
     @Column(name = "data_type", length = 50)
     private String dataType;
 
-    @Column
+    @Column(name = "\"year\"")
     private Integer year;
 
-    @Column
+    @Column(name = "\"month\"")
     private Integer month;
 
     @Column(name = "actual_value", precision = 15, scale = 2)

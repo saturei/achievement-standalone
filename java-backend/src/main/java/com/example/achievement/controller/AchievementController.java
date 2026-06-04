@@ -7,6 +7,7 @@ import com.example.achievement.dto.response.AchievementStatisticsResponse;
 import com.example.achievement.dto.response.StatusRecordResponse;
 import com.example.achievement.dto.response.VersionRecordResponse;
 import com.example.achievement.service.AchievementService;
+import com.example.achievement.service.DingTalkAchievementSyncService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -24,6 +26,7 @@ import java.util.Map;
 public class AchievementController {
 
     private final AchievementService achievementService;
+    private final DingTalkAchievementSyncService dingTalkAchievementSyncService;
 
     @GetMapping
     @Operation(summary = "获取成果列表")
@@ -42,8 +45,15 @@ public class AchievementController {
 
     @GetMapping("/statistics")
     @Operation(summary = "获取成果统计")
-    public ResponseEntity<AchievementStatisticsResponse> getStatistics() {
-        return ResponseEntity.ok(achievementService.getStatistics());
+    public ResponseEntity<AchievementStatisticsResponse> getStatistics(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String departmentName,
+            @RequestParam(required = false) String organizationNames,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String productId,
+            @RequestParam(required = false) Boolean includeDeleted) {
+        return ResponseEntity.ok(achievementService.getStatistics(
+                keyword, departmentName, organizationNames, status, productId, includeDeleted));
     }
 
     @GetMapping("/{achievementId}")
@@ -148,5 +158,39 @@ public class AchievementController {
             @RequestParam(required = false) String productId) {
         return ResponseEntity.ok(achievementService.getFilteredOptions(
                 keyword, departmentName, organizationNames, status, productId));
+    }
+
+    @PostMapping("/sync-from-dingtalk")
+    @Operation(summary = "从钉钉同步成果数据")
+    public ResponseEntity<Map<String, Object>> syncFromDingTalk() {
+        try {
+            Map<String, Object> result = dingTalkAchievementSyncService.syncFromDingTalk();
+            return ResponseEntity.ok(result);
+        } catch (IllegalStateException e) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", "钉钉未配置");
+            return ResponseEntity.status(400).body(error);
+        } catch (Exception e) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(error);
+        }
+    }
+
+    @GetMapping("/sync-diff")
+    @Operation(summary = "对比钉钉源数据与本地数据差异")
+    public ResponseEntity<Map<String, Object>> syncDiff() {
+        try {
+            Map<String, Object> result = dingTalkAchievementSyncService.diffWithDingTalk();
+            return ResponseEntity.ok(result);
+        } catch (IllegalStateException e) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", "钉钉未配置");
+            return ResponseEntity.status(400).body(error);
+        } catch (Exception e) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(error);
+        }
     }
 }

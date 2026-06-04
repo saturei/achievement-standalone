@@ -11,6 +11,7 @@
             class="header-menu"
           >
             <el-menu-item index="/target-statistics">目标统计</el-menu-item>
+            <el-menu-item index="/dashboard">生产总览</el-menu-item>
             <el-menu-item index="/">成果列表</el-menu-item>
             <el-menu-item index="/pre-register">预注册</el-menu-item>
           </el-menu>
@@ -36,14 +37,29 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item @click="router.push('/user-management')">
-                    <el-icon><User /></el-icon> 用户管理
+                  <el-dropdown-item @click="router.push('/signing-tracker')">
+                    签约跟踪
                   </el-dropdown-item>
-                  <el-dropdown-item @click="router.push('/contract-signings')">
-                    <el-icon><Document /></el-icon> 签约明细
+                  <el-dropdown-item @click="router.push('/revenue-tracker')">
+                    确权收入跟踪
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/cost-tracker')">
+                    成本跟踪
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/achievement-tracker')">
+                    成果跟踪
+                  </el-dropdown-item>
+                  <el-dropdown-item divided @click="router.push('/contract-signings')">
+                    签约明细管理
                   </el-dropdown-item>
                   <el-dropdown-item @click="router.push('/revenue-recognitions')">
-                    <el-icon><Money /></el-icon> 确权/收入明细
+                    确权/收入明细管理
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="router.push('/user-management')">
+                    用户管理
+                  </el-dropdown-item>
+                  <el-dropdown-item divided @click="handleSyncData">
+                    同步钉钉数据
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -63,6 +79,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowDown, User, Document, Money } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
@@ -99,6 +116,16 @@ const handleUserChange = (val) => {
 const roleLabel = (role) => {
   const m = { ADMIN: '管理员', DEPT_LEADER: '部门负责人', ORG_LEADER: '机构负责人', USER: '普通用户' }
   return m[role] || role
+}
+
+const handleSyncData = async () => {
+  try {
+    const res = await axios.post('/api/data/sync-all')
+    const total = res.data.total_count || 0
+    ElMessage.success(`钉钉数据同步完成，共 ${total} 条`)
+  } catch (e) {
+    ElMessage.error('同步失败: ' + (e.response?.data?.error || e.message))
+  }
 }
 </script>
 

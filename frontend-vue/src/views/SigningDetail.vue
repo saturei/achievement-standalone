@@ -34,37 +34,37 @@
       <el-table :data="tableData" stripe border style="width: 100%; font-size: 13px" v-loading="loading"
         @selection-change="handleSelectionChange" max-height="600" row-key="id">
         <el-table-column type="selection" width="40" />
-        <el-table-column prop="contractId" label="合同ID" width="120">
+        <el-table-column prop="contractId" label="合同ID" width="120" sortable>
           <template #default="{ row }">
             <el-input v-if="editingRows.has(row.id)" v-model="row.contractId" size="small" />
             <span v-else>{{ row.contractId || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="contractName" label="合同名称" width="160" show-overflow-tooltip>
+        <el-table-column prop="contractName" label="合同名称" width="160" show-overflow-tooltip sortable>
           <template #default="{ row }">
             <el-input v-if="editingRows.has(row.id)" v-model="row.contractName" size="small" />
             <span v-else>{{ row.contractName || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="orderId" label="订单ID" width="110" show-overflow-tooltip>
+        <el-table-column prop="orderId" label="订单ID" width="110" show-overflow-tooltip sortable>
           <template #default="{ row }">
             <el-input v-if="editingRows.has(row.id)" v-model="row.orderId" size="small" />
             <span v-else>{{ row.orderId || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="customerName" label="关联客户" width="120" show-overflow-tooltip>
+        <el-table-column prop="customerName" label="关联客户" width="120" show-overflow-tooltip sortable>
           <template #default="{ row }">
             <el-input v-if="editingRows.has(row.id)" v-model="row.customerName" size="small" />
             <span v-else>{{ row.customerName || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="签约金额(万元)" width="130" align="right">
+        <el-table-column label="签约金额(万元)" width="130" align="right" prop="amount" sortable>
           <template #default="{ row }">
             <el-input v-if="editingRows.has(row.id)" v-model="row._amountWan" size="small" type="number" placeholder="万元" />
             <span v-else>{{ formatWan(row.amount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="organization" label="所属机构" width="140">
+        <el-table-column prop="organization" label="所属机构" width="140" sortable>
           <template #default="{ row }">
             <el-select v-if="editingRows.has(row.id)" v-model="row.organization" size="small" filterable allow-create style="width:100%">
               <el-option v-for="o in orgOptions" :key="o" :label="o" :value="o" />
@@ -72,13 +72,13 @@
             <span v-else>{{ row.organization || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="签约归属年月" width="130">
+        <el-table-column label="签约归属年月" width="130" prop="signMonth" sortable>
           <template #default="{ row }">
             <el-date-picker v-if="editingRows.has(row.id)" v-model="row.signMonth" size="small" type="month" format="YYYY-MM" value-format="YYYY-MM" style="width:100%" />
             <span v-else>{{ row.signMonth || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="签约风险等级" width="120">
+        <el-table-column label="签约风险等级" width="120" prop="signingRiskLevel" sortable>
           <template #default="{ row }">
             <el-select v-if="editingRows.has(row.id)" v-model="row.signingRiskLevel" size="small" clearable style="width:100%">
               <el-option v-for="r in riskOptions" :key="r" :label="r" :value="r" />
@@ -86,19 +86,19 @@
             <span v-else>{{ row.signingRiskLevel || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="operator" label="经营岗" width="90">
+        <el-table-column prop="operator" label="经营岗" width="90" sortable>
           <template #default="{ row }">
             <el-input v-if="editingRows.has(row.id)" v-model="row.operator" size="small" />
             <span v-else>{{ row.operator || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="所属分区" width="110">
+        <el-table-column label="所属分区" width="110" prop="region" sortable>
           <template #default="{ row }">
             <el-input v-if="editingRows.has(row.id)" v-model="row.region" size="small" />
             <span v-else>{{ row.region || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="productId" label="产品ID" width="110" show-overflow-tooltip>
+        <el-table-column prop="productId" label="产品ID" width="110" show-overflow-tooltip sortable>
           <template #default="{ row }">
             <el-input v-if="editingRows.has(row.id)" v-model="row.productId" size="small" />
             <span v-else>{{ row.productId || '-' }}</span>

@@ -1,0 +1,25 @@
+# ============================================
+# 钉钉多维表格 API 配置
+# 将本文件复制为 config.yaml 并填入真实配置
+# ============================================
+
+# 钉钉应用凭证
+dingtalk:
+  app_key: "your_app_key"
+  app_secret: "your_app_secret"
+  operator_id: "your_operator_id"
+
+# 钉钉多维表格的 base_id
+base_id: "your_base_id"
+
+# 需要同步的表格列表
+tables:
+  - id: "table_1_id"
+    name: "成果登记表"
+    description: "产品成果明细登记薄"
+  - id: "table_2_id"
+    name: "签约明细表"
+    description: "签约合同明细数据"
+  - id: "table_3_id"
+    name: "确权明细表"
+    description: "收入确权明细数据"

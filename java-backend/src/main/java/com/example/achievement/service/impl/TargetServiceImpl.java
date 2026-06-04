@@ -44,29 +44,8 @@ public class TargetServiceImpl implements TargetService {
     public TargetStatisticsResponse getStatistics(String dimension, Integer year, String product, String organization, String owner, String subCategory) {
         System.out.println("========== DEBUG: Parameters - dimension=" + dimension + ", year=" + year + ", product=" + product + ", organization=" + organization + ", owner=" + owner + ", subCategory=" + subCategory);
         
-        // 直接使用JdbcTemplate查询
-        String sql = "SELECT * FROM targets WHERE year = ?";
-        List<Target> targets = jdbcTemplate.query(sql, new Object[]{year}, (rs, rowNum) -> {
-            Target target = new Target();
-            target.setId(rs.getString("id"));
-            target.setDepartment(rs.getString("department"));
-            target.setOrganization(rs.getString("organization"));
-            target.setCategory(rs.getString("category"));
-            target.setSubCategory(rs.getString("sub_category"));
-            target.setTargetType(rs.getString("target_type"));
-            target.setYear(rs.getInt("year"));
-            target.setAnnualTarget(rs.getBigDecimal("annual_target"));
-            target.setQ1Target(rs.getBigDecimal("q1_target"));
-            target.setQ2Target(rs.getBigDecimal("q2_target"));
-            target.setQ3Target(rs.getBigDecimal("q3_target"));
-            target.setQ4Target(rs.getBigDecimal("q4_target"));
-            target.setQ1Actual(rs.getBigDecimal("q1_actual"));
-            target.setQ2Actual(rs.getBigDecimal("q2_actual"));
-            target.setQ3Actual(rs.getBigDecimal("q3_actual"));
-            target.setQ4Actual(rs.getBigDecimal("q4_actual"));
-            target.setOwner(rs.getString("owner"));
-            return target;
-        });
+        // 使用 JPA Repository 查询（兼容 H2 和 SQLite）
+        List<Target> targets = targetRepository.findByYear(year);
         
         System.out.println("========== DEBUG: Found " + targets.size() + " targets for year " + year + " using JdbcTemplate");
         log.info("Found {} targets for year {}", targets.size(), year);
@@ -903,24 +882,7 @@ public class TargetServiceImpl implements TargetService {
     public Map<String, List<TargetStatisticsResponse.QuarterlyData>> getQuarterlySummary(Integer year, String organization) {
         Map<String, List<TargetStatisticsResponse.QuarterlyData>> result = new java.util.LinkedHashMap<>();
 
-        List<Target> targets = jdbcTemplate.query(
-                "SELECT * FROM targets WHERE year = ?",
-                new Object[]{year},
-                (rs, rowNum) -> {
-                    Target t = new Target();
-                    t.setId(rs.getString("id"));
-                    t.setOrganization(rs.getString("organization"));
-                    t.setSubCategory(rs.getString("sub_category"));
-                    t.setQ1Target(rs.getBigDecimal("q1_target"));
-                    t.setQ2Target(rs.getBigDecimal("q2_target"));
-                    t.setQ3Target(rs.getBigDecimal("q3_target"));
-                    t.setQ4Target(rs.getBigDecimal("q4_target"));
-                    t.setQ1Actual(rs.getBigDecimal("q1_actual"));
-                    t.setQ2Actual(rs.getBigDecimal("q2_actual"));
-                    t.setQ3Actual(rs.getBigDecimal("q3_actual"));
-                    t.setQ4Actual(rs.getBigDecimal("q4_actual"));
-                    return t;
-                });
+        List<Target> targets = targetRepository.findByYear(year);
 
         if (organization != null && !organization.isEmpty()) {
             Set<String> orgSet = new HashSet<>(Arrays.asList(organization.split(",")));
@@ -973,7 +935,7 @@ public class TargetServiceImpl implements TargetService {
     @Override
     public String testDatabaseCount() {
         long jpaCount = targetRepository.count();
-        Integer sqlCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM targets WHERE year=2026", Integer.class);
+        Integer sqlCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM targets WHERE \"year\"=2026", Integer.class);
         Integer totalCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM targets", Integer.class);
         return String.format("JPA count: %d, SQL count for 2026: %d, Total SQL count: %d", jpaCount, sqlCount, totalCount);
     }

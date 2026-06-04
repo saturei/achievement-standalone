@@ -30,7 +30,7 @@ public class Target {
     @Column(name = "target_type", length = 50)
     private String targetType;
 
-    @Column
+    @Column(name = "\"year\"")
     private Integer year;
 
     @Column(name = "annual_target", precision = 15, scale = 2)

@@ -19,7 +19,9 @@ public interface AchievementService {
     Map<String, List<String>> getFilteredOptions(String keyword, String departmentName,
                                                   String organizationNames, String status, String productId);
 
-    AchievementStatisticsResponse getStatistics();
+    AchievementStatisticsResponse getStatistics(String keyword, String departmentName,
+                                                 String organizationNames, String status,
+                                                 String productId, Boolean includeDeleted);
 
     AchievementResponse getAchievement(String achievementId);
 

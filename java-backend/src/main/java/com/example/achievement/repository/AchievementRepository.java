@@ -54,6 +54,9 @@ public interface AchievementRepository extends JpaRepository<Achievement, String
     List<Achievement> findByNameAndProductExternalVersionOrderByCreatedAtDesc(
             String name, String productExternalVersion);
 
+    @Query(value = "SELECT * FROM achievements WHERE name = :name AND product_id = :productId ORDER BY created_at DESC", nativeQuery = true)
+    List<Achievement> findByNameAndProductId(@Param("name") String name, @Param("productId") String productId);
+
     @Query(value = "SELECT * FROM achievements WHERE name = :name AND product_external_version = :productExternalVersion ORDER BY created_at DESC LIMIT 1", nativeQuery = true)
     Optional<Achievement> findTopByNameAndProductExternalVersionOrderByCreatedAtDesc(
             @Param("name") String name, @Param("productExternalVersion") String productExternalVersion);
@@ -65,6 +68,34 @@ public interface AchievementRepository extends JpaRepository<Achievement, String
 
     @Query(value = "SELECT COUNT(*) FROM achievements WHERE status <> 'DELETED'", nativeQuery = true)
     long countAllExcludingDeleted();
+
+    @Query(value = "SELECT COUNT(*) FROM achievements WHERE " +
+           "(:keyword IS NULL OR name LIKE '%' || :keyword || '%' OR description LIKE '%' || :keyword || '%' OR id LIKE '%' || :keyword || '%') AND " +
+           "(:departmentName IS NULL OR department_name = :departmentName) AND " +
+           "(:organizationNames IS NULL OR ',' || :organizationNames || ',' LIKE '%,' || organization_name || ',%') AND " +
+           "(:productId IS NULL OR product_id = :productId) AND " +
+           "(:includeDeleted = 1 OR status <> 'DELETED')", nativeQuery = true)
+    long countFilteredExcludingDeleted(
+            @Param("keyword") String keyword,
+            @Param("departmentName") String departmentName,
+            @Param("organizationNames") String organizationNames,
+            @Param("productId") String productId,
+            @Param("includeDeleted") int includeDeleted);
+
+    @Query(value = "SELECT COUNT(*) FROM achievements WHERE " +
+           "(:keyword IS NULL OR name LIKE '%' || :keyword || '%' OR description LIKE '%' || :keyword || '%' OR id LIKE '%' || :keyword || '%') AND " +
+           "(:departmentName IS NULL OR department_name = :departmentName) AND " +
+           "(:organizationNames IS NULL OR ',' || :organizationNames || ',' LIKE '%,' || organization_name || ',%') AND " +
+           "(:productId IS NULL OR product_id = :productId) AND " +
+           "(:includeDeleted = 1 OR status <> 'DELETED') AND " +
+           "status = :countStatus", nativeQuery = true)
+    long countByStatusWithFilters(
+            @Param("keyword") String keyword,
+            @Param("departmentName") String departmentName,
+            @Param("organizationNames") String organizationNames,
+            @Param("productId") String productId,
+            @Param("includeDeleted") int includeDeleted,
+            @Param("countStatus") String countStatus);
 
     @Query(value = "SELECT DISTINCT organization_name FROM achievements WHERE organization_name IS NOT NULL AND organization_name <> '' AND status <> 'DELETED' ORDER BY organization_name", nativeQuery = true)
     List<String> findDistinctOrganizationNames();

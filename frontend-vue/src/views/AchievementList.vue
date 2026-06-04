@@ -38,6 +38,7 @@
         <el-form-item>
           <el-button @click="handleReset">重置</el-button>
           <el-button type="primary" @click="handlePreRegister">预注册</el-button>
+          <el-button v-if="dtConfigured" type="warning" :loading="syncingFromDingTalk" @click="syncFromDingTalk">从钉钉同步</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -204,11 +205,14 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import axios from 'axios'
 import achievementApi from '../api/achievement'
 
 const router = useRouter()
 const loading = ref(false)
 const achievements = ref([])
+const dtConfigured = ref(false)
+const syncingFromDingTalk = ref(false)
 const organizationOptions = ref([])
 const departmentOptions = ref([])
 const statistics = ref({
@@ -255,7 +259,33 @@ onMounted(() => {
   loadStatistics()
   loadAchievements()
   loadFilterOptions()
+  checkDingTalkStatus()
 })
+
+// 检查钉钉配置状态
+const checkDingTalkStatus = async () => {
+  try {
+    const res = await axios.get('/api/detail/dingtalk-status')
+    dtConfigured.value = res.data?.configured === true
+  } catch (e) {
+    dtConfigured.value = false
+  }
+}
+
+// 从钉钉同步成果
+const syncFromDingTalk = async () => {
+  syncingFromDingTalk.value = true
+  try {
+    const res = await axios.post('/api/achievements/sync-from-dingtalk')
+    const { imported, skipped, total } = res.data
+    ElMessage.success(`从钉钉同步完成：导入 ${imported} 条，跳过 ${skipped} 条，共 ${total} 条`)
+    loadAchievements()
+  } catch (e) {
+    ElMessage.error('从钉钉同步失败: ' + (e.response?.data?.error || e.message))
+  } finally {
+    syncingFromDingTalk.value = false
+  }
+}
 
 const loadFilterOptions = async () => {
   try {
@@ -275,7 +305,13 @@ const loadFilterOptions = async () => {
 
 const loadStatistics = async () => {
   try {
-    const data = await achievementApi.getStatistics()
+    const params = {}
+    if (searchForm.keyword) params.keyword = searchForm.keyword
+    if (searchForm.departmentName) params.departmentName = searchForm.departmentName
+    if (searchForm.organizationNames.length > 0) params.organizationNames = searchForm.organizationNames.join(',')
+    if (searchForm.status) params.status = searchForm.status
+    if (searchForm.productId) params.productId = searchForm.productId
+    const data = await achievementApi.getStatistics(params)
     statistics.value = data
   } catch (error) {
     console.error('加载统计数据失败:', error)
@@ -307,6 +343,7 @@ const loadAchievements = async () => {
 const handleFilterChange = () => {
   pagination.page = 1
   loadAchievements()
+  loadStatistics()
   loadFilterOptions()
 }
 

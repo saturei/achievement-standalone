@@ -53,7 +53,7 @@ public class RevenueRecognition {
     @Column
     private Integer quarter;
 
-    @Column
+    @Column(name = "\"year\"")
     private Integer year;
 
     @Column(name = "created_at", updatable = false)

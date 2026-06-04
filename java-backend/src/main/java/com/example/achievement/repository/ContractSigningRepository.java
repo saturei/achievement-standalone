@@ -21,10 +21,10 @@ public interface ContractSigningRepository extends JpaRepository<ContractSigning
 
     List<ContractSigning> findByContractIdAndPackageId(String contractId, String packageId);
 
-    @Query(value = "SELECT organization, year, quarter, sub_category, SUM(amount) FROM contract_signings " +
-           "WHERE sub_category IS NOT NULL GROUP BY organization, year, quarter, sub_category ORDER BY organization, year, quarter", nativeQuery = true)
+    @Query(value = "SELECT organization, \"year\", quarter, sub_category, SUM(amount) FROM contract_signings " +
+           "WHERE sub_category IS NOT NULL GROUP BY organization, \"year\", quarter, sub_category ORDER BY organization, \"year\", quarter", nativeQuery = true)
     List<Object[]> sumAmountByOrgYearQuarter();
 
-    @Query(value = "SELECT SUM(amount) FROM contract_signings WHERE organization = :org AND year = :year AND quarter = :quarter", nativeQuery = true)
+    @Query(value = "SELECT SUM(amount) FROM contract_signings WHERE organization = :org AND \"year\" = :year AND quarter = :quarter", nativeQuery = true)
     java.math.BigDecimal sumAmountByOrgYearQuarter(@Param("org") String org, @Param("year") int year, @Param("quarter") int quarter);
 }

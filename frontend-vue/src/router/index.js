@@ -61,6 +61,31 @@ const routes = [
     path: '/revenue-recognitions',
     name: 'RevenueRecognitions',
     component: () => import('../views/RecognitionDetail.vue')
+  },
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: () => import('../views/Dashboard.vue')
+  },
+  {
+    path: '/signing-tracker',
+    name: 'SigningTracker',
+    component: () => import('../views/SigningTracker.vue')
+  },
+  {
+    path: '/revenue-tracker',
+    name: 'RevenueTracker',
+    component: () => import('../views/RevenueTracker.vue')
+  },
+  {
+    path: '/cost-tracker',
+    name: 'CostTracker',
+    component: () => import('../views/CostTracker.vue')
+  },
+  {
+    path: '/achievement-tracker',
+    name: 'AchievementTracker',
+    component: () => import('../views/AchievementTracker.vue')
   }
 ]
 
