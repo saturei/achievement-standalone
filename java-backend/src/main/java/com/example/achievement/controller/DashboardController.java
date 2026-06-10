@@ -15,33 +15,46 @@ public class DashboardController {
 
     private final JdbcTemplate jdbcTemplate;
 
+    // 季度→月份范围映射
+    private static final Map<String, String> QUARTER_MONTHS = new LinkedHashMap<>();
+    static {
+        QUARTER_MONTHS.put("一季度", "'01','02','03'");
+        QUARTER_MONTHS.put("二季度", "'04','05','06'");
+        QUARTER_MONTHS.put("三季度", "'07','08','09'");
+        QUARTER_MONTHS.put("四季度", "'10','11','12'");
+    }
+
     // ===== KPI 卡片 =====
 
     @GetMapping("/kpi")
-    public ResponseEntity<Map<String, Object>> getKpis() {
+    public ResponseEntity<Map<String, Object>> getKpis(
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String orgUnit,
+            @RequestParam(required = false) String year,
+            @RequestParam(required = false) String quarter) {
         Map<String, Object> kpis = new LinkedHashMap<>();
 
-        // 签约总额(万元)
         kpis.put("signingContractTotal", queryBigDecimal(
-                "SELECT COALESCE(SUM(signing_amount_wan),0) FROM dt_signing_contracts"));
-        // 派单总额(万元)
+                applyFilter("SELECT COALESCE(SUM(signing_amount_wan),0) FROM dt_signing_contracts",
+                        null, department, null, year, quarter, "signing_quarter")));
         kpis.put("signingOrderTotal", queryBigDecimal(
-                "SELECT COALESCE(SUM(order_amount_wan),0) FROM dt_signing_orders"));
-        // 确权收入(万元)
+                applyFilter("SELECT COALESCE(SUM(order_amount_wan),0) FROM dt_signing_orders",
+                        null, department, null, year, quarter, "signing_quarter")));
         kpis.put("revenueTotal", queryBigDecimal(
-                "SELECT COALESCE(SUM(revenue_amount_wan),0) FROM dt_revenue_details"));
-        // 交付毛利(万元)
+                applyFilter("SELECT COALESCE(SUM(revenue_amount_wan),0) FROM dt_revenue_details",
+                        orgUnit, null, null, year, quarter, "recognition_month")));
         kpis.put("deliveryMargin", queryBigDecimal(
-                "SELECT COALESCE(SUM(delivery_margin),0) FROM dt_revenue_details"));
-        // 成果验收数
+                applyFilter("SELECT COALESCE(SUM(delivery_margin),0) FROM dt_revenue_details",
+                        orgUnit, null, null, year, quarter, "recognition_month")));
         kpis.put("acceptedAchievements", queryLong(
-                "SELECT COUNT(*) FROM dt_achievements WHERE actual_accept_date IS NOT NULL"));
-        // 成果总数
+                applyFilter("SELECT COUNT(*) FROM dt_achievements WHERE actual_accept_date IS NOT NULL",
+                        orgUnit, null, null, year, quarter, "planned_accept_date")));
         kpis.put("totalAchievements", queryLong(
-                "SELECT COUNT(*) FROM dt_achievements"));
-        // 成本合计(万元)
+                applyFilter("SELECT COUNT(*) FROM dt_achievements",
+                        orgUnit, null, null, year, quarter, "planned_accept_date")));
         kpis.put("costTotal", queryBigDecimal(
-                "SELECT COALESCE(SUM(actual_cost_total),0) FROM dt_department_budgets"));
+                applyFilter("SELECT COALESCE(SUM(actual_cost_total),0) FROM dt_department_budgets",
+                        null, department, "dept_name", year, null, "year")));
 
         return ResponseEntity.ok(kpis);
     }
@@ -49,73 +62,105 @@ public class DashboardController {
     // ===== 部门签约排名 =====
 
     @GetMapping("/department-signing")
-    public ResponseEntity<List<Map<String, Object>>> departmentSigning() {
-        String sql = "SELECT department, SUM(amount) as total_amount FROM (" +
+    public ResponseEntity<List<Map<String, Object>>> departmentSigning(
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String year,
+            @RequestParam(required = false) String quarter) {
+        String contractPart = applyFilter(
                 "SELECT department, COALESCE(SUM(signing_amount_wan),0) as amount " +
-                "FROM dt_signing_contracts WHERE department IS NOT NULL GROUP BY department " +
-                "UNION ALL " +
+                "FROM dt_signing_contracts WHERE department IS NOT NULL GROUP BY department",
+                null, department, null, year, quarter, "signing_quarter");
+        String orderPart = applyFilter(
                 "SELECT department, COALESCE(SUM(order_amount_wan),0) as amount " +
-                "FROM dt_signing_orders WHERE department IS NOT NULL GROUP BY department" +
+                "FROM dt_signing_orders WHERE department IS NOT NULL GROUP BY department",
+                null, department, null, year, quarter, "signing_quarter");
+
+        String sql = "SELECT department, SUM(amount) as total_amount FROM (" +
+                contractPart + " UNION ALL " + orderPart +
                 ") t GROUP BY department ORDER BY total_amount DESC";
-        List<Map<String, Object>> result = jdbcTemplate.queryForList(sql);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(jdbcTemplate.queryForList(sql));
     }
 
     // ===== 月度收入趋势 =====
 
     @GetMapping("/revenue-monthly")
-    public ResponseEntity<List<Map<String, Object>>> revenueMonthly() {
-        String sql = "SELECT recognition_month, COALESCE(SUM(revenue_amount_wan),0) as amount, " +
-                "COUNT(*) as count FROM dt_revenue_details " +
-                "WHERE recognition_month IS NOT NULL " +
-                "GROUP BY recognition_month ORDER BY recognition_month";
+    public ResponseEntity<List<Map<String, Object>>> revenueMonthly(
+            @RequestParam(required = false) String orgUnit,
+            @RequestParam(required = false) String year,
+            @RequestParam(required = false) String quarter) {
+        String sql = applyFilter(
+                "SELECT recognition_month, COALESCE(SUM(revenue_amount_wan),0) as amount, " +
+                "COUNT(*) as count FROM dt_revenue_details WHERE recognition_month IS NOT NULL",
+                orgUnit, null, null, year, quarter, "recognition_month");
+        sql += " GROUP BY recognition_month ORDER BY recognition_month";
         return ResponseEntity.ok(jdbcTemplate.queryForList(sql));
     }
 
     // ===== 成果状态分布 =====
 
     @GetMapping("/achievement-status")
-    public ResponseEntity<Map<String, Object>> achievementStatus() {
+    public ResponseEntity<Map<String, Object>> achievementStatus(
+            @RequestParam(required = false) String orgUnit,
+            @RequestParam(required = false) String year,
+            @RequestParam(required = false) String quarter) {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("byForm", jdbcTemplate.queryForList(
-                "SELECT achievement_form, COUNT(*) as count FROM dt_achievements GROUP BY achievement_form"));
+                applyFilter("SELECT achievement_form, COUNT(*) as count FROM dt_achievements",
+                        orgUnit, null, null, year, quarter, "planned_accept_date") +
+                " GROUP BY achievement_form"));
         status.put("byOrg", jdbcTemplate.queryForList(
-                "SELECT org_unit, COUNT(*) as total, " +
+                applyFilter("SELECT org_unit, COUNT(*) as total, " +
                 "SUM(CASE WHEN actual_accept_date IS NOT NULL THEN 1 ELSE 0 END) as accepted " +
-                "FROM dt_achievements WHERE org_unit IS NOT NULL GROUP BY org_unit"));
+                "FROM dt_achievements WHERE org_unit IS NOT NULL",
+                orgUnit, null, null, year, quarter, "planned_accept_date") +
+                " GROUP BY org_unit"));
         return ResponseEntity.ok(status);
     }
 
     // ===== 签约风险结构 =====
 
     @GetMapping("/signing-risk")
-    public ResponseEntity<List<Map<String, Object>>> signingRisk() {
-        String sql = "SELECT signing_risk_level, COALESCE(SUM(signing_amount_wan),0) as amount, " +
-                "COUNT(*) as count FROM dt_signing_contracts " +
-                "WHERE signing_risk_level IS NOT NULL GROUP BY signing_risk_level";
+    public ResponseEntity<List<Map<String, Object>>> signingRisk(
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String year,
+            @RequestParam(required = false) String quarter) {
+        String sql = applyFilter(
+                "SELECT signing_risk_level, COALESCE(SUM(signing_amount_wan),0) as amount, " +
+                "COUNT(*) as count FROM dt_signing_contracts WHERE signing_risk_level IS NOT NULL",
+                null, department, null, year, quarter, "signing_quarter");
+        sql += " GROUP BY signing_risk_level";
         return ResponseEntity.ok(jdbcTemplate.queryForList(sql));
     }
 
     // ===== 部门预算 vs 实际 =====
 
     @GetMapping("/department-budget")
-    public ResponseEntity<List<Map<String, Object>>> departmentBudget() {
-        String sql = "SELECT dept_name, dept_head, " +
+    public ResponseEntity<List<Map<String, Object>>> departmentBudget(
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String year) {
+        String sql = applyFilter(
+                "SELECT dept_name, dept_head, " +
                 "COALESCE(budget_total,0) as budget, COALESCE(actual_cost_total,0) as actual, " +
                 "(COALESCE(actual_cost_total,0) - COALESCE(budget_total,0)) as diff, " +
                 "CASE WHEN COALESCE(budget_total,0) > 0 " +
                 "THEN ROUND(COALESCE(actual_cost_total,0)*100.0/budget_total,1) ELSE 0 END as execute_rate " +
-                "FROM dt_department_budgets ORDER BY actual_cost_total DESC";
+                "FROM dt_department_budgets",
+                null, department, "dept_name", year, null, "year");
+        sql += " ORDER BY actual_cost_total DESC";
         return ResponseEntity.ok(jdbcTemplate.queryForList(sql));
     }
 
     // ===== 产品概览 =====
 
     @GetMapping("/products")
-    public ResponseEntity<List<Map<String, Object>>> products() {
+    public ResponseEntity<List<Map<String, Object>>> products(
+            @RequestParam(required = false) String department) {
         String sql = "SELECT product_id, product_name, product_department, " +
                 "COALESCE(annual_budget_wan,0) as budget, COALESCE(cost_accumulated,0) as cost " +
                 "FROM dt_products";
+        if (department != null && !department.isEmpty()) {
+            sql += " WHERE product_department = '" + department.replace("'", "''") + "'";
+        }
         return ResponseEntity.ok(jdbcTemplate.queryForList(sql));
     }
 
@@ -210,13 +255,76 @@ public class DashboardController {
         options.put("riskLevels", jdbcTemplate.queryForList(
                 "SELECT DISTINCT signing_risk_level FROM dt_signing_contracts WHERE signing_risk_level IS NOT NULL"));
         options.put("quarters", jdbcTemplate.queryForList(
-                "SELECT DISTINCT signing_quarter FROM dt_signing_contracts WHERE signing_quarter IS NOT NULL"));
+                "SELECT DISTINCT signing_quarter FROM dt_signing_contracts " +
+                "WHERE signing_quarter IS NOT NULL AND signing_quarter != ''"));
         options.put("orgUnits", jdbcTemplate.queryForList(
                 "SELECT DISTINCT org_unit FROM dt_achievements WHERE org_unit IS NOT NULL"));
         options.put("recognitionMonths", jdbcTemplate.queryForList(
                 "SELECT DISTINCT recognition_month FROM dt_revenue_details " +
                 "WHERE recognition_month IS NOT NULL ORDER BY recognition_month"));
+        options.put("years", jdbcTemplate.queryForList(
+                "SELECT DISTINCT SUBSTR(recognition_month,1,4) as year FROM dt_revenue_details " +
+                "WHERE recognition_month IS NOT NULL " +
+                "UNION SELECT DISTINCT CAST(year AS TEXT) FROM dt_department_budgets WHERE year IS NOT NULL " +
+                "ORDER BY year DESC"));
         return ResponseEntity.ok(options);
+    }
+
+    // ===== 动态 WHERE 构建 =====
+
+    /**
+     * 在已有 SQL 后追加筛选条件。自动处理 WHERE 缺失和 GROUP BY 位置。
+     */
+    private String applyFilter(String baseSql, String orgUnit,
+                                String department, String deptColumn,
+                                String year, String quarter, String timeColumn) {
+        // 分离 GROUP BY 及之后的部分
+        String upperSql = baseSql.toUpperCase();
+        String prefix = baseSql;
+        String suffix = "";
+        int gbIdx = upperSql.indexOf("GROUP BY");
+        if (gbIdx >= 0) {
+            prefix = baseSql.substring(0, gbIdx);
+            suffix = " " + baseSql.substring(gbIdx);
+        }
+        // 若无 WHERE，补 WHERE 1=1（在 GROUP BY 之前）
+        if (!prefix.toUpperCase().contains("WHERE")) {
+            prefix += " WHERE 1=1";
+        }
+        // 拼接筛选条件
+        StringBuilder cond = new StringBuilder();
+        if (orgUnit != null && !orgUnit.isEmpty()) {
+            cond.append(" AND org_unit = '").append(orgUnit.replace("'", "''")).append("'");
+        }
+        if (department != null && !department.isEmpty()) {
+            String col = (deptColumn != null) ? deptColumn : "department";
+            cond.append(" AND ").append(col).append(" = '")
+                    .append(department.replace("'", "''")).append("'");
+        }
+        if (year != null && !year.isEmpty() && timeColumn != null) {
+            cond.append(" AND ").append(timeColumn).append(" LIKE '")
+                    .append(year.replace("'", "''")).append("%'");
+        }
+        if (quarter != null && !quarter.isEmpty() && timeColumn != null) {
+            appendQuarterCondition(cond, quarter, timeColumn);
+        }
+        return prefix + cond.toString() + suffix;
+    }
+
+    /**
+     * 根据时间列类型追加季度条件。
+     */
+    private void appendQuarterCondition(StringBuilder cond, String quarter, String timeColumn) {
+        String safeQuarter = quarter.replace("'", "''");
+        if ("signing_quarter".equals(timeColumn)) {
+            cond.append(" AND ").append(timeColumn).append(" = '").append(safeQuarter).append("'");
+        } else {
+            String months = QUARTER_MONTHS.get(quarter);
+            if (months != null) {
+                cond.append(" AND CAST(SUBSTR(").append(timeColumn).append(",6,2) AS INTEGER) IN (")
+                        .append(months).append(")");
+            }
+        }
     }
 
     // ===== 工具方法 =====

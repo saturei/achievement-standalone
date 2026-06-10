@@ -11,7 +11,14 @@
             class="header-menu"
           >
             <el-menu-item index="/target-statistics">目标统计</el-menu-item>
-            <el-menu-item index="/dashboard">生产总览</el-menu-item>
+            <el-sub-menu index="/dashboard-group">
+              <template #title>生产总览</template>
+              <el-menu-item index="/dashboard">总览看板</el-menu-item>
+              <el-menu-item index="/signing-tracker">签约跟踪</el-menu-item>
+              <el-menu-item index="/revenue-tracker">确权收入跟踪</el-menu-item>
+              <el-menu-item index="/cost-tracker">成本跟踪</el-menu-item>
+              <el-menu-item index="/achievement-tracker">成果跟踪</el-menu-item>
+            </el-sub-menu>
             <el-menu-item index="/">成果列表</el-menu-item>
             <el-menu-item index="/pre-register">预注册</el-menu-item>
           </el-menu>
@@ -37,19 +44,7 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item @click="router.push('/signing-tracker')">
-                    签约跟踪
-                  </el-dropdown-item>
-                  <el-dropdown-item @click="router.push('/revenue-tracker')">
-                    确权收入跟踪
-                  </el-dropdown-item>
-                  <el-dropdown-item @click="router.push('/cost-tracker')">
-                    成本跟踪
-                  </el-dropdown-item>
-                  <el-dropdown-item @click="router.push('/achievement-tracker')">
-                    成果跟踪
-                  </el-dropdown-item>
-                  <el-dropdown-item divided @click="router.push('/contract-signings')">
+                  <el-dropdown-item @click="router.push('/contract-signings')">
                     签约明细管理
                   </el-dropdown-item>
                   <el-dropdown-item @click="router.push('/revenue-recognitions')">
@@ -167,6 +162,14 @@ const handleSyncData = async () => {
 .header-menu .el-menu-item {
   color: #fff;
   border-bottom: none;
+}
+
+.header-menu .el-sub-menu__title {
+  color: #fff !important;
+  border-bottom: none !important;
+}
+.header-menu .el-sub-menu__title:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .header-menu .el-menu-item:hover {

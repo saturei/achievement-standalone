@@ -1,9 +1,48 @@
 <template>
   <div class="dashboard-page">
+    <!-- 筛选栏 -->
+    <el-row :gutter="16" class="filter-bar">
+      <el-col :span="3">
+        <el-select v-model="filters.department" placeholder="部门" clearable style="width:100%"
+          @change="reloadAll">
+          <el-option label="全部" value="" />
+          <el-option v-for="d in filterOptions.departments" :key="d.department"
+            :label="d.department" :value="d.department" />
+        </el-select>
+      </el-col>
+      <el-col :span="3">
+        <el-select v-model="filters.orgUnit" placeholder="组织机构" clearable style="width:100%"
+          @change="reloadAll">
+          <el-option label="全部" value="" />
+          <el-option v-for="o in filterOptions.orgUnits" :key="o.org_unit"
+            :label="o.org_unit" :value="o.org_unit" />
+        </el-select>
+      </el-col>
+      <el-col :span="2">
+        <el-select v-model="filters.year" placeholder="年份" clearable style="width:100%"
+          @change="reloadAll">
+          <el-option label="全部" value="" />
+          <el-option v-for="y in filterOptions.years" :key="y.year"
+            :label="y.year" :value="y.year" />
+        </el-select>
+      </el-col>
+      <el-col :span="3">
+        <el-select v-model="filters.quarter" placeholder="季度" clearable style="width:100%"
+          @change="reloadAll">
+          <el-option label="全部" value="" />
+          <el-option v-for="q in filterOptions.quarters" :key="q.signing_quarter"
+            :label="q.signing_quarter" :value="q.signing_quarter" />
+        </el-select>
+      </el-col>
+      <el-col :span="2">
+        <el-button @click="resetFilters" :disabled="!hasFilter">重置</el-button>
+      </el-col>
+    </el-row>
+
     <!-- KPI 卡片行 -->
     <el-row :gutter="20" class="kpi-row">
       <el-col :span="6">
-        <el-card shadow="hover" v-loading="kpiLoading">
+        <el-card shadow="hover" v-loading="kpiLoading" class="kpi-clickable" @click="router.push('/signing-tracker')">
           <div class="kpi-card">
             <div class="kpi-label">签约总额(万元)</div>
             <div class="kpi-value">{{ formatWan(kpiData.signingTotal) }}</div>
@@ -12,7 +51,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" v-loading="kpiLoading">
+        <el-card shadow="hover" v-loading="kpiLoading" class="kpi-clickable" @click="router.push('/revenue-tracker')">
           <div class="kpi-card">
             <div class="kpi-label">确权收入(万元)</div>
             <div class="kpi-value">{{ formatWan(kpiData.revenueTotal) }}</div>
@@ -21,7 +60,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" v-loading="kpiLoading">
+        <el-card shadow="hover" v-loading="kpiLoading" class="kpi-clickable" @click="router.push('/cost-tracker')">
           <div class="kpi-card">
             <div class="kpi-label">交付毛利(万元)</div>
             <div class="kpi-value">{{ (kpiData.deliveryMargin / 100).toFixed(2) }}</div>
@@ -30,7 +69,7 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover" v-loading="kpiLoading">
+        <el-card shadow="hover" v-loading="kpiLoading" class="kpi-clickable" @click="router.push('/achievement-tracker')">
           <div class="kpi-card">
             <div class="kpi-label">成果验收</div>
             <div class="kpi-value">
@@ -96,6 +135,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import VChart from 'vue-echarts'
@@ -105,6 +145,48 @@ import { BarChart, PieChart, LineChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent, LegendComponent, TitleComponent } from 'echarts/components'
 
 use([CanvasRenderer, BarChart, PieChart, LineChart, GridComponent, TooltipComponent, LegendComponent, TitleComponent])
+
+const router = useRouter()
+
+// 筛选状态
+const filters = reactive({
+  department: '',
+  orgUnit: '',
+  year: '',
+  quarter: ''
+})
+const filterOptions = reactive({
+  departments: [],
+  orgUnits: [],
+  years: [],
+  quarters: []
+})
+const hasFilter = computed(() => filters.department || filters.orgUnit || filters.year || filters.quarter)
+
+const buildFilterParams = () => {
+  const params = {}
+  if (filters.department) params.department = filters.department
+  if (filters.orgUnit) params.orgUnit = filters.orgUnit
+  if (filters.year) params.year = filters.year
+  if (filters.quarter) params.quarter = filters.quarter
+  return params
+}
+
+const resetFilters = () => {
+  filters.department = ''
+  filters.orgUnit = ''
+  filters.year = ''
+  filters.quarter = ''
+  reloadAll()
+}
+
+const reloadAll = () => {
+  loadKpis()
+  loadDeptSigning()
+  loadSigningRisk()
+  loadRevenueMonthly()
+  loadAchievementStatus()
+}
 
 const kpiLoading = ref(false)
 const chartLoading1 = ref(false)
@@ -270,7 +352,7 @@ const achievementFormOption = computed(() => ({
 const loadKpis = async () => {
   kpiLoading.value = true
   try {
-    const res = await axios.get('/api/dashboard/kpi')
+    const res = await axios.get('/api/dashboard/kpi', { params: buildFilterParams() })
     const d = res.data || {}
     kpiData.signingTotal = (Number(d.signingContractTotal) || 0) + (Number(d.signingOrderTotal) || 0)
     kpiData.revenueTotal = Number(d.revenueTotal) || 0
@@ -288,7 +370,7 @@ const loadKpis = async () => {
 const loadDeptSigning = async () => {
   chartLoading1.value = true
   try {
-    const res = await axios.get('/api/dashboard/department-signing')
+    const res = await axios.get('/api/dashboard/department-signing', { params: buildFilterParams() })
     deptSigningData.value = res.data || []
   } catch (e) {
     ElMessage.error('加载部门签约排名失败')
@@ -301,7 +383,7 @@ const loadDeptSigning = async () => {
 const loadSigningRisk = async () => {
   chartLoading2.value = true
   try {
-    const res = await axios.get('/api/dashboard/signing-risk')
+    const res = await axios.get('/api/dashboard/signing-risk', { params: buildFilterParams() })
     riskPieData.value = res.data || []
   } catch (e) {
     ElMessage.error('加载签约风险数据失败')
@@ -314,7 +396,7 @@ const loadSigningRisk = async () => {
 const loadRevenueMonthly = async () => {
   chartLoading3.value = true
   try {
-    const res = await axios.get('/api/dashboard/revenue-monthly')
+    const res = await axios.get('/api/dashboard/revenue-monthly', { params: buildFilterParams() })
     revenueMonthlyData.value = res.data || []
   } catch (e) {
     ElMessage.error('加载月度收入数据失败')
@@ -327,7 +409,7 @@ const loadRevenueMonthly = async () => {
 const loadAchievementStatus = async () => {
   chartLoading4.value = true
   try {
-    const res = await axios.get('/api/dashboard/achievement-status')
+    const res = await axios.get('/api/dashboard/achievement-status', { params: buildFilterParams() })
     achievementFormData.value = res.data?.byForm || []
   } catch (e) {
     ElMessage.error('加载成果状态数据失败')
@@ -336,18 +418,38 @@ const loadAchievementStatus = async () => {
   }
 }
 
+// 加载筛选选项
+const loadFilterOptions = async () => {
+  try {
+    const res = await axios.get('/api/dashboard/filter-options')
+    if (res.data) {
+      filterOptions.departments = res.data.departments || []
+      filterOptions.orgUnits = res.data.orgUnits || []
+      filterOptions.years = res.data.years || []
+      filterOptions.quarters = res.data.quarters || []
+    }
+  } catch (e) {
+    console.error('加载筛选选项失败:', e)
+  }
+}
+
 onMounted(() => {
-  loadKpis()
-  loadDeptSigning()
-  loadSigningRisk()
-  loadRevenueMonthly()
-  loadAchievementStatus()
+  loadFilterOptions()
+  reloadAll()
 })
 </script>
 
 <style scoped>
 .dashboard-page {
   padding: 0;
+}
+
+.filter-bar {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 4px;
+  align-items: center;
 }
 
 .kpi-row {
@@ -357,6 +459,15 @@ onMounted(() => {
 .kpi-card {
   text-align: center;
   padding: 8px 0;
+}
+
+.kpi-clickable {
+  cursor: pointer;
+  transition: border-color 0.3s, transform 0.2s;
+}
+.kpi-clickable:hover {
+  border-color: #409eff;
+  transform: translateY(-2px);
 }
 
 .kpi-label {
