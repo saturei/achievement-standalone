@@ -1,6 +1,7 @@
 # 编译输出
 java-backend/target/
 **/*.class
+*.jar
 
 # 数据库文件
 *.db

@@ -81,6 +81,38 @@ public class DashboardController {
         return ResponseEntity.ok(jdbcTemplate.queryForList(sql));
     }
 
+    // ===== 产品签约排名 =====
+
+    @GetMapping("/product-signing")
+    public ResponseEntity<List<Map<String, Object>>> productSigning(
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String year,
+            @RequestParam(required = false) String quarter) {
+        String contractPart = applyFilter(
+                "SELECT COALESCE(p.product_name, SUBSTR(sc.linked_package, 1, LENGTH(sc.linked_package)-4)) as product_name, " +
+                "COALESCE(SUM(sc.signing_amount_wan),0) as amount " +
+                "FROM dt_signing_contracts sc " +
+                "LEFT JOIN dt_products p ON SUBSTR(sc.linked_package, 1, LENGTH(sc.linked_package)-4) = p.product_id " +
+                "WHERE sc.linked_package IS NOT NULL",
+                null, department, null, year, quarter, "sc.signing_quarter");
+        contractPart += " GROUP BY COALESCE(p.product_name, SUBSTR(sc.linked_package, 1, LENGTH(sc.linked_package)-4))";
+
+        String orderPart = applyFilter(
+                "SELECT COALESCE(p.product_name, SUBSTR(so.linked_package, 1, LENGTH(so.linked_package)-4)) as product_name, " +
+                "COALESCE(SUM(so.order_amount_wan),0) as amount " +
+                "FROM dt_signing_orders so " +
+                "LEFT JOIN dt_products p ON SUBSTR(so.linked_package, 1, LENGTH(so.linked_package)-4) = p.product_id " +
+                "WHERE so.linked_package IS NOT NULL",
+                null, department, null, year, quarter, "so.signing_quarter");
+        orderPart += " GROUP BY COALESCE(p.product_name, SUBSTR(so.linked_package, 1, LENGTH(so.linked_package)-4))";
+
+        String sql = "SELECT product_name, SUM(amount) as total_amount FROM (" +
+                contractPart + " UNION ALL " + orderPart +
+                ") t WHERE product_name IS NOT NULL AND product_name != '' AND product_name NOT LIKE 'CP_99%'" +
+                " GROUP BY product_name ORDER BY total_amount DESC";
+        return ResponseEntity.ok(jdbcTemplate.queryForList(sql));
+    }
+
     // ===== 月度收入趋势 =====
 
     @GetMapping("/revenue-monthly")

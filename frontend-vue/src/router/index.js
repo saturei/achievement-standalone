@@ -94,4 +94,34 @@ const router = createRouter({
   routes
 })
 
+// 路由守卫：检查登录状态
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('dingtalk_token')
+  // 有 token 直接放行
+  if (token) {
+    next()
+    return
+  }
+  // 开发环境：有 currentUser 也放行（兼容旧逻辑）
+  const stored = localStorage.getItem('currentUser')
+  if (stored) {
+    try {
+      const user = JSON.parse(stored)
+      if (user.username) {
+        next()
+        return
+      }
+    } catch (e) {}
+  }
+  // 未登录，检查是否在钉钉环境中
+  const isDingTalk = /DingTalk/i.test(navigator.userAgent)
+  if (!isDingTalk) {
+    // 非钉钉环境：允许访问（后续 App.vue 会处理登录）
+    next()
+    return
+  }
+  // 钉钉内未登录：允许访问，App.vue 会自动触发登录
+  next()
+})
+
 export default router

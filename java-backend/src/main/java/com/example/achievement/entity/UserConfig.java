@@ -16,8 +16,14 @@ public class UserConfig {
     @Column(length = 50, nullable = false, unique = true)
     private String username;
 
+    @Column(name = "user_id", length = 256)
+    private String userId;
+
     @Column(name = "display_name", length = 100)
     private String displayName;
+
+    @Column(length = 512)
+    private String avatar;
 
     @Column(length = 20, nullable = false)
     private String role = "USER";

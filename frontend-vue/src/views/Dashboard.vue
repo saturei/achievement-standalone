@@ -89,7 +89,7 @@
         <el-card>
           <template #header>
             <div class="card-header">
-              <span>部门签约排名</span>
+              <span>产品签约排名</span>
             </div>
           </template>
           <v-chart :option="deptSigningOption" style="height:350px" :loading="chartLoading1" />
@@ -207,7 +207,7 @@ const formatWan = (val) => {
   return (Number(val) / 10000).toFixed(2)
 }
 
-// ---------- 部门签约排名 ----------
+// ---------- 产品签约排名 ----------
 const deptSigningData = ref([])
 const deptSigningOption = computed(() => ({
   tooltip: {
@@ -221,7 +221,7 @@ const deptSigningOption = computed(() => ({
   grid: { left: '3%', right: '8%', bottom: '3%', containLabel: true, top: 10 },
   xAxis: {
     type: 'category',
-    data: deptSigningData.value.map(d => d.department || ''),
+    data: deptSigningData.value.map(d => d.product_name || ''),
     axisLabel: { rotate: 30, fontSize: 11 }
   },
   yAxis: {
@@ -366,14 +366,14 @@ const loadKpis = async () => {
   }
 }
 
-// 加载部门签约排名
+// 加载产品签约排名
 const loadDeptSigning = async () => {
   chartLoading1.value = true
   try {
-    const res = await axios.get('/api/dashboard/department-signing', { params: buildFilterParams() })
+    const res = await axios.get('/api/dashboard/product-signing', { params: buildFilterParams() })
     deptSigningData.value = res.data || []
   } catch (e) {
-    ElMessage.error('加载部门签约排名失败')
+    ElMessage.error('加载产品签约排名失败')
   } finally {
     chartLoading1.value = false
   }

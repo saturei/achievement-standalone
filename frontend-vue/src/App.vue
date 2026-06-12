@@ -1,6 +1,18 @@
 <template>
   <div id="app">
-    <el-container>
+    <!-- 钉钉环境：未登录时显示登录页面 -->
+    <div v-if="isDingTalk && !loggedIn" class="login-container">
+      <div class="login-card">
+        <h2>成果管理系统</h2>
+        <p>正在通过钉钉登录...</p>
+        <el-button type="primary" :loading="loginLoading" @click="doDingTalkLogin">
+          钉钉授权登录
+        </el-button>
+        <p v-if="loginError" class="login-error">{{ loginError }}</p>
+      </div>
+    </div>
+
+    <el-container v-else>
       <el-header>
         <div class="header-content">
           <h1>成果管理系统</h1>
@@ -23,20 +35,32 @@
             <el-menu-item index="/pre-register">预注册</el-menu-item>
           </el-menu>
           <div class="header-right">
-            <el-select
-              v-model="currentUser"
-              placeholder="选择当前用户"
-              size="small"
-              style="width: 160px; margin-right: 12px"
-              @change="handleUserChange"
-            >
-              <el-option
-                v-for="u in userList"
-                :key="u.username"
-                :label="u.displayName + ' (' + roleLabel(u.role) + ')'"
-                :value="u.username"
-              />
-            </el-select>
+            <!-- 已登录：显示用户名 + 角色 -->
+            <template v-if="loggedIn">
+              <span class="user-info">
+                <el-avatar v-if="avatar" :size="28" :src="avatar" />
+                {{ displayName }}
+                <el-tag size="small" type="info" style="margin-left:6px">{{ roleTag }}</el-tag>
+              </span>
+              <el-button size="small" text @click="handleLogout">退出</el-button>
+            </template>
+            <!-- 未登录（开发环境）：用户选择 -->
+            <template v-else>
+              <el-select
+                v-model="currentUser"
+                placeholder="选择当前用户"
+                size="small"
+                style="width: 160px; margin-right: 12px"
+                @change="handleUserChange"
+              >
+                <el-option
+                  v-for="u in userList"
+                  :key="u.username"
+                  :label="u.displayName + ' (' + roleLabel(u.role) + ')'"
+                  :value="u.username"
+                />
+              </el-select>
+            </template>
             <el-dropdown trigger="click">
               <el-button size="small" type="info" plain>
                 管理
@@ -72,17 +96,129 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowDown, User, Document, Money } from '@element-plus/icons-vue'
+import { ArrowDown } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
 const activeMenu = computed(() => route.path)
+
+// ===== 钉钉登录状态 =====
+const loggedIn = ref(false)
+const displayName = ref('')
+const avatar = ref('')
+const roleTag = ref('')
+const loginLoading = ref(false)
+const loginError = ref('')
+const isDingTalk = /DingTalk/i.test(navigator.userAgent)
+
+// ===== 开发环境用户选择（降级） =====
 const currentUser = ref('admin')
 const userList = ref([{ username: 'admin', displayName: '管理员', role: 'ADMIN' }])
 
 onMounted(async () => {
+  // 1. 先检查是否已有 JWT Token
+  const token = localStorage.getItem('dingtalk_token')
+  if (token) {
+    await checkLoginStatus()
+    return
+  }
+
+  // 2. 钉钉环境：自动发起登录
+  if (isDingTalk) {
+    doDingTalkLogin()
+    return
+  }
+
+  // 3. 开发环境：加载旧用户列表
+  await loadUserList()
+})
+
+// ---------- 钉钉登录 ----------
+const doDingTalkLogin = async () => {
+  loginLoading.value = true
+  loginError.value = ''
+
+  try {
+    // 调用钉钉 JSAPI 获取 authCode
+    let authCode = null
+    if (window.dd && typeof window.dd.getAuthCode === 'function') {
+      authCode = await new Promise((resolve, reject) => {
+        window.dd.getAuthCode({
+          corpId: 'ding4651594f561e9defacaaa37764f94726',
+          success: (res) => resolve(res.authCode || res.code),
+          fail: (err) => reject(new Error(err.errorMessage || '获取授权码失败'))
+        })
+      })
+    }
+
+    if (!authCode) {
+      loginError.value = '请点击按钮授权登录'
+      loginLoading.value = false
+      return
+    }
+
+    // 后端交换 token
+    const res = await axios.post('/api/auth/dingtalk/login', { authCode })
+    const data = res.data
+
+    // 保存 token 和用户信息
+    localStorage.setItem('dingtalk_token', data.token)
+    const userInfo = {
+      username: data.user.username,
+      displayName: data.user.displayName,
+      role: data.user.role,
+      avatar: data.user.avatar || ''
+    }
+    localStorage.setItem('currentUser', JSON.stringify(userInfo))
+
+    loggedIn.value = true
+    displayName.value = data.user.displayName
+    avatar.value = data.user.avatar || ''
+    roleTag.value = roleLabel(data.user.role)
+
+    ElMessage.success('钉钉登录成功')
+  } catch (e) {
+    const msg = e.response?.data?.error || e.message || '登录失败'
+    loginError.value = msg
+    console.error('钉钉登录失败:', e)
+  } finally {
+    loginLoading.value = false
+  }
+}
+
+// ---------- 检查登录状态 ----------
+const checkLoginStatus = async () => {
+  try {
+    const res = await axios.get('/api/auth/me')
+    const user = res.data
+    if (user) {
+      loggedIn.value = true
+      displayName.value = user.displayName || user.username
+      avatar.value = user.avatar || ''
+      roleTag.value = roleLabel(user.role)
+    }
+  } catch (e) {
+    // token 失效，清除
+    localStorage.removeItem('dingtalk_token')
+    localStorage.removeItem('currentUser')
+    if (isDingTalk) {
+      doDingTalkLogin()
+    } else {
+      await loadUserList()
+    }
+  }
+}
+
+const handleLogout = () => {
+  localStorage.removeItem('dingtalk_token')
+  localStorage.removeItem('currentUser')
+  window.location.reload()
+}
+
+// ---------- 开发环境用户列表 ----------
+const loadUserList = async () => {
   try {
     const res = await axios.get('/api/users')
     if (res.data) {
@@ -98,7 +234,7 @@ onMounted(async () => {
       currentUser.value = u.username
     } catch (e) {}
   }
-})
+}
 
 const handleUserChange = (val) => {
   const user = userList.value.find(u => u.username === val)
@@ -113,6 +249,7 @@ const roleLabel = (role) => {
   return m[role] || role
 }
 
+// ---------- 钉钉数据同步 ----------
 const handleSyncData = async () => {
   try {
     const res = await axios.post('/api/data/sync-all')
@@ -131,6 +268,42 @@ const handleSyncData = async () => {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
+}
+
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.login-card {
+  background: #fff;
+  padding: 40px 48px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+}
+
+.login-card h2 {
+  margin: 0 0 12px 0;
+  font-size: 22px;
+  color: #303133;
+}
+
+.login-card p {
+  color: #909399;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.login-error {
+  color: #f56c6c;
+  margin-top: 12px;
+  font-size: 13px;
 }
 
 .el-header {
@@ -185,6 +358,13 @@ const handleSyncData = async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  color: #fff;
+  font-size: 14px;
 }
 
 .el-main {

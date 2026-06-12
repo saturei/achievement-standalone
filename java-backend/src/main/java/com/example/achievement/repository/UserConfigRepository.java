@@ -12,5 +12,7 @@ public interface UserConfigRepository extends JpaRepository<UserConfig, String> 
 
     Optional<UserConfig> findByUsername(String username);
 
+    Optional<UserConfig> findByUserId(String userId);
+
     List<UserConfig> findByEnabled(Integer enabled);
 }

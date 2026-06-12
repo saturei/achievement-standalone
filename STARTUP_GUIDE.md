@@ -14,8 +14,10 @@
 | 数据库检查 | 验证 `data/achievement.db` SQLite 数据库 |
 | 后端构建启动 | Java Spring Boot → 端口 8080 (SQLite) |
 | 前端启动 | Vue + Vite → 端口 3000 |
-| 钉钉同步 API | FastAPI → 端口 8000（需 config.yaml） |
+| 钉钉同步 API | FastAPI → 端口 8000 (可选，需 config.yaml，启动失败不阻塞) |
 | 统一停止 | Ctrl+C 一键停止所有服务 |
+
+> **注意**: dingtalk-fastapi (端口 8000) 是辅助开发/调试用途的可选组件，生产环境由 Java 后端直连钉钉 API。start.sh 仍会尝试启动它，但启动失败不会导致整体启动中断。
 
 ## 📱 服务地址
 
@@ -33,15 +35,30 @@
 
 ### 数据导入
 
-如果数据库为空，可通过以下方式导入数据：
+当前数据主要通过钉钉同步方式导入，不再依赖 Excel 文件：
 
 ```bash
-# 导入成果数据（成果全量249条.xlsx → achievements 表）
-python3 reimport_achievements.py
-
-# 导入目标数据（产品-xl.xlsx → targets 表）
-python3 init_targets.py
+# 通过 Swagger UI 或浏览器调用全量同步
+curl -X POST http://localhost:8080/api/data/sync-all
 ```
+
+同步完成后 Dashboard 和成果管理数据即自动可用。也可以在前端页面中通过「数据同步」按钮触发。
+
+> 历史 Excel 导入脚本 (`reimport_achievements.py` / `init_targets.py`) 仅作参考，当前 targets 数据已由 `DingTalkDataService` 从钉钉数据仓库自动聚合同步。
+
+## 🔐 钉钉登录
+
+### 开发环境 (sqlite/dev profile)
+无需认证，所有 API 可直调。兼容旧版 `X-Current-User` header。
+
+### 生产环境 (prod profile)
+需通过钉钉 JSAPI 登录：
+
+1. 前端调用 `dd.getAuthCode()` 获取授权码
+2. 后端 `POST /api/auth/dingtalk/login` 换取 JWT Token
+3. 后续请求携带 `Authorization: Bearer <token>` header
+
+`/api/auth/**` 端点以 `permitAll` 开放，其余 `/api/**` 需 JWT 认证。
 
 ## 🔧 钉钉数据同步 API
 
@@ -62,6 +79,18 @@ source venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+## 📦 部署打包
+
+```bash
+# 构建部署包 (JAR + 前端静态文件 + 数据库)
+./deploy.sh
+```
+
+输出到 `deploy/` 目录：
+- `achievement-service-1.0.0.jar` - 后端 JAR
+- `static/` - 前端构建产物
+- `start.sh` - 部署环境启动脚本
 
 ## ⚙️ 手动启动各服务
 
