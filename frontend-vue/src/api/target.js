@@ -5,7 +5,7 @@ export const targetApi = {
   getStatistics: (params) => request.get(`/targets/statistics`, { params }),
   
   // 获取月度分布数据
-  getMonthlyDistribution: (year) => request.get(`/targets/distribution`, { params: { year } }),
+  getMonthlyDistribution: (params) => request.get(`/targets/distribution`, { params }),
   
   // 保存实际数据
   saveActualData: (data) => request.post('/targets/actual', data),
@@ -25,6 +25,12 @@ export const targetApi = {
   
   // 获取所有产品列表
   getAllProducts: () => request.get('/targets/products'),
+
+  // 获取所有部门列表
+  getAllDepartments: () => request.get('/targets/departments'),
+
+  // 获取部门-机构对照关系
+  getDepartmentOrganizationMap: () => request.get('/targets/department-organizations'),
   
   // 获取所有机构列表
   getAllOrganizations: () => request.get('/targets/organizations'),

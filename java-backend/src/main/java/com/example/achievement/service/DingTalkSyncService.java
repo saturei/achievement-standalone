@@ -28,9 +28,10 @@ public class DingTalkSyncService {
     private static final Pattern MONTH_DASH = Pattern.compile("^(\\d{4})-(\\d{1,2})$");
 
     public Map<String, Object> syncSignings() {
-        List<Map<String, Object>> records = dingTalkClient.listAllRecords(props.getSheetSignings());
+        String sheetId = dingTalkClient.resolveSheetId(props.getSheetSignings());
+        List<Map<String, Object>> records = dingTalkClient.listAllRecords(sheetId);
         int imported = 0;
-        int skipped = 0;
+        int updated = 0;
 
         for (Map<String, Object> raw : records) {
             try {
@@ -38,7 +39,24 @@ public class DingTalkSyncService {
                 List<ContractSigning> existings = signingRepository.findByContractIdAndPackageId(
                         s.getContractId(), s.getPackageId());
                 if (!existings.isEmpty()) {
-                    skipped++;
+                    // 更新已有记录
+                    ContractSigning existing = existings.get(0);
+                    existing.setContractName(s.getContractName());
+                    existing.setOrderId(s.getOrderId());
+                    existing.setLeadId(s.getLeadId());
+                    existing.setCustomerName(s.getCustomerName());
+                    existing.setAmount(s.getAmount());
+                    existing.setAccountingType(s.getAccountingType());
+                    existing.setOrganization(s.getOrganization());
+                    existing.setSignMonth(s.getSignMonth());
+                    existing.setSigningRiskLevel(s.getSigningRiskLevel());
+                    existing.setRecognitionRiskLevel(s.getRecognitionRiskLevel());
+                    existing.setOperator(s.getOperator());
+                    existing.setRemark(s.getRemark());
+                    existing.setRegion(s.getRegion());
+                    existing.setProductId(s.getProductId());
+                    signingRepository.save(existing);
+                    updated++;
                     continue;
                 }
                 s.setId(UUID.randomUUID().toString());
@@ -51,13 +69,14 @@ public class DingTalkSyncService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("imported", imported);
-        result.put("skipped", skipped);
+        result.put("updated", updated);
         result.put("total", records.size());
         return result;
     }
 
     public Map<String, Object> syncRecognitions() {
-        List<Map<String, Object>> records = dingTalkClient.listAllRecords(props.getSheetRecognitions());
+        String sheetId = dingTalkClient.resolveSheetId(props.getSheetRecognitions());
+        List<Map<String, Object>> records = dingTalkClient.listAllRecords(sheetId);
         int imported = 0;
         int skipped = 0;
 

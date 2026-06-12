@@ -46,8 +46,10 @@ public class TargetController {
     @GetMapping("/distribution")
     @Operation(summary = "获取月度成果分布")
     public ResponseEntity<MonthlyDistributionResponse> getMonthlyDistribution(
-            @RequestParam Integer year) {
-        return ResponseEntity.ok(targetService.getMonthlyDistribution(year));
+            @RequestParam Integer year,
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String organization) {
+        return ResponseEntity.ok(targetService.getMonthlyDistribution(year, department, organization));
     }
 
     @PostMapping("/actual")
@@ -74,6 +76,18 @@ public class TargetController {
     @Operation(summary = "获取所有机构列表")
     public ResponseEntity<java.util.List<String>> getAllOrganizations() {
         return ResponseEntity.ok(targetService.getAllOrganizations());
+    }
+
+    @GetMapping("/departments")
+    @Operation(summary = "获取所有部门列表")
+    public ResponseEntity<java.util.List<String>> getAllDepartments() {
+        return ResponseEntity.ok(targetService.getAllDepartments());
+    }
+
+    @GetMapping("/department-organizations")
+    @Operation(summary = "获取部门-机构对照关系")
+    public ResponseEntity<java.util.List<java.util.Map<String, String>>> getDepartmentOrganizationMap() {
+        return ResponseEntity.ok(targetService.getDepartmentOrganizationMap());
     }
 
     @GetMapping("/owners")
@@ -111,7 +125,9 @@ public class TargetController {
     @GetMapping("/quarterly-summary")
     @Operation(summary = "获取季度汇总数据")
     public ResponseEntity<java.util.Map<String, java.util.List<com.example.achievement.dto.response.TargetStatisticsResponse.QuarterlyData>>>
-            getQuarterlySummary(@RequestParam Integer year, @RequestParam(required = false) String organization) {
-        return ResponseEntity.ok(targetService.getQuarterlySummary(year, organization));
+            getQuarterlySummary(@RequestParam Integer year,
+                                @RequestParam(required = false) String department,
+                                @RequestParam(required = false) String organization) {
+        return ResponseEntity.ok(targetService.getQuarterlySummary(year, department, organization));
     }
 }

@@ -36,6 +36,8 @@ dingtalk:
   baseId: 7dx2rn0JbY4y54XwI2gz73NMVMGjLRb3
   operatorId: hrLezKRiP5iSDyzxF9xpIYPwiEiE
   data-warehouse-base-id: y20BglGWO2y56y7nC0aDvlb08A7depqY
+  sheet-signings: JlxW9XQ
+  sheet-recognitions: xaVX4ia
 
 springdoc:
   api-docs:

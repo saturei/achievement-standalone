@@ -3,7 +3,7 @@
     <!-- 钉钉环境：未登录时显示登录页面 -->
     <div v-if="isDingTalk && !loggedIn" class="login-container">
       <div class="login-card">
-        <h2>成果管理系统</h2>
+        <h2>产品目标管理平台</h2>
         <p>正在通过钉钉登录...</p>
         <el-button type="primary" :loading="loginLoading" @click="doDingTalkLogin">
           钉钉授权登录
@@ -15,7 +15,7 @@
     <el-container v-else>
       <el-header>
         <div class="header-content">
-          <h1>成果管理系统</h1>
+          <h1>产品目标管理平台</h1>
           <el-menu
             mode="horizontal"
             :default-active="activeMenu"
@@ -77,8 +77,8 @@
                   <el-dropdown-item @click="router.push('/user-management')">
                     用户管理
                   </el-dropdown-item>
-                  <el-dropdown-item divided @click="handleSyncData">
-                    同步钉钉数据
+                  <el-dropdown-item divided @click="router.push('/dingtalk-sync')">
+                    钉钉数据同步
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>

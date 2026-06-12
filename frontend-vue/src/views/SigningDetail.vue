@@ -189,7 +189,7 @@ const handleSyncFromDingTalk = async () => {
   try {
     const res = await axios.post('/api/detail/signings/sync-from-dingtalk')
     const data = res.data
-    ElMessage.success(`钉钉导入完成：成功 ${data.imported} 条，跳过重复 ${data.skipped} 条`)
+    ElMessage.success(`钉钉导入完成：新增 ${data.imported} 条，更新 ${data.updated} 条`)
     loadData()
   } catch (e) {
     ElMessage.error('钉钉导入失败: ' + (e.response?.data?.error || e.message))

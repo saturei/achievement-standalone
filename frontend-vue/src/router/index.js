@@ -86,6 +86,11 @@ const routes = [
     path: '/achievement-tracker',
     name: 'AchievementTracker',
     component: () => import('../views/AchievementTracker.vue')
+  },
+  {
+    path: '/dingtalk-sync',
+    name: 'DingTalkSync',
+    component: () => import('../views/DingTalkSync.vue')
   }
 ]
 

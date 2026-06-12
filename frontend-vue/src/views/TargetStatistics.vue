@@ -436,6 +436,7 @@ const departmentOptions = ref([])
 const organizationOptions = ref([])
 const ownerOptions = ref([])
 const subCategoryFilterOptions = ref([])
+const organizationDepartmentOptions = ref([])
 
 // 统计数据
 const statistics = ref({
@@ -508,27 +509,9 @@ const actualValueTotal = computed(() => {
   return q1 + q2 + q3 + q4
 })
 
-const organizationDepartmentOptions = [
-  { organization: 'AI方案研发机构', department: 'AI方案中心' },
-  { organization: 'AI场景研发机构', department: 'AI方案中心' },
-  { organization: 'AI方案中心本级', department: 'AI方案中心' },
-  { organization: '端技术底座机构', department: '能力中心' },
-  { organization: 'AI技术底座机构', department: '能力中心' },
-  { organization: 'POC方案验证机构', department: '能力中心' },
-  { organization: '服务技术底座机构', department: '能力中心' },
-  { organization: '能力中心本级', department: '能力中心' },
-  { organization: '数据中心本级', department: '数据中心' },
-  { organization: '业务方案高风险机构', department: '业务方案中心' },
-  { organization: '业务方案中风险机构', department: '业务方案中心' },
-  { organization: '业务方案中心本级', department: '业务方案中心' },
-  { organization: '中台运营机构', department: 'FM平台中心' },
-  { organization: '生产工具机构', department: 'FM平台中心' },
-  { organization: 'FM平台中心本级', department: 'FM平台中心' }
-]
-
 const filteredOrganizationOptions = computed(() => {
   if (filterForm.value.department) {
-    return organizationDepartmentOptions
+    return organizationDepartmentOptions.value
       .filter(item => item.department === filterForm.value.department)
       .map(item => item.organization)
   }
@@ -556,14 +539,16 @@ onUnmounted(() => {
 // 加载筛选选项
 const loadFilterOptions = async () => {
   try {
-    const [products, organizations, owners] = await Promise.all([
-      targetApi.getAllProducts(),
+    const [departments, organizations, owners, deptOrgMap] = await Promise.all([
+      targetApi.getAllDepartments(),
       targetApi.getAllOrganizations(),
-      targetApi.getAllOwners()
+      targetApi.getAllOwners(),
+      targetApi.getDepartmentOrganizationMap()
     ])
-    departmentOptions.value = products || []
+    departmentOptions.value = departments || []
     organizationOptions.value = organizations || []
     ownerOptions.value = owners || []
+    organizationDepartmentOptions.value = deptOrgMap || []
   } catch (error) {
     console.error('加载筛选选项失败:', error)
   }
@@ -623,7 +608,10 @@ const loadStatistics = async () => {
 // 加载月度分布数据
 const loadMonthlyDistribution = async () => {
   try {
-    const response = await targetApi.getMonthlyDistribution(filterForm.value.year)
+    const params = { year: filterForm.value.year }
+    if (filterForm.value.department) params.department = filterForm.value.department
+    if (filterForm.value.organizations.length > 0) params.organization = filterForm.value.organizations.join(',')
+    const response = await targetApi.getMonthlyDistribution(params)
     if (response && response.monthlyData) {
       monthlyData.value = response.monthlyData
       updateAllCharts()
@@ -684,10 +672,10 @@ const loadTableData = async () => {
 
 const loadQuarterlySummary = async () => {
   try {
-    const response = await targetApi.getQuarterlySummary({
-      year: filterForm.value.year,
-      organization: filterForm.value.organizations.length > 0 ? filterForm.value.organizations.join(',') : undefined
-    })
+    const params = { year: filterForm.value.year }
+    if (filterForm.value.department) params.department = filterForm.value.department
+    if (filterForm.value.organizations.length > 0) params.organization = filterForm.value.organizations.join(',')
+    const response = await targetApi.getQuarterlySummary(params)
     if (response) {
       quarterlySummary.value = response
     }
@@ -875,7 +863,7 @@ const handleEditRow = (row) => {
 
 // 机构选择变化
 const handleDefineOrgChange = (value) => {
-  const org = organizationDepartmentOptions.find(item => item.organization === value)
+  const org = organizationDepartmentOptions.value.find(item => item.organization === value)
   if (org) {
     defineForm.department = org.department
   }

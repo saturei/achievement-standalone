@@ -328,19 +328,29 @@ public class TargetServiceImpl implements TargetService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public MonthlyDistributionResponse getMonthlyDistribution(Integer year) {
+    public MonthlyDistributionResponse getMonthlyDistribution(Integer year, String department, String organization) {
         List<MonthlyDistributionResponse.MonthlyData> monthlyDataList = new ArrayList<>();
         int totalCount = 0;
         int maxCount = Integer.MIN_VALUE;
         int minCount = Integer.MAX_VALUE;
         int maxMonth = 1;
         int minMonth = 1;
+
+        // 解析机构筛选（逗号分隔的多选）
+        Set<String> orgFilter = (organization != null && !organization.isEmpty())
+                ? new HashSet<>(Arrays.asList(organization.split(",")))
+                : null;
         
         for (int month = 1; month <= 12; month++) {
             final int currentMonth = month;
             
             List<Achievement> allAchievements = achievementRepository.findAll();
+            
+            // 筛选：部门 & 机构
+            allAchievements = allAchievements.stream()
+                    .filter(a -> (department == null || department.isEmpty() || department.equals(a.getDepartmentName())))
+                    .filter(a -> (orgFilter == null || (a.getOrganizationName() != null && orgFilter.contains(a.getOrganizationName()))))
+                    .collect(Collectors.toList());
             
             List<Achievement> preRegisterAchievements = allAchievements.stream()
                     .filter(a -> a.getStatus() == AchievementStatus.PRE_REGISTER)
@@ -785,6 +795,34 @@ public class TargetServiceImpl implements TargetService {
     }
 
     @Override
+    public List<String> getAllDepartments() {
+        // 部门名称：从 target 表中取 department，但排除与 organization 同名的行
+        // 因为签约同步时 organization 会从 department 复制，导致混入机构名
+        return targetRepository.findAll().stream()
+                .filter(t -> t.getDepartment() != null && !t.getDepartment().isEmpty())
+                .filter(t -> t.getOrganization() == null || !t.getDepartment().equals(t.getOrganization()))
+                .map(Target::getDepartment)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Map<String, String>> getDepartmentOrganizationMap() {
+        return targetRepository.findAll().stream()
+                .filter(t -> t.getDepartment() != null && !t.getDepartment().isEmpty())
+                .filter(t -> t.getOrganization() != null && !t.getOrganization().isEmpty())
+                .map(t -> {
+                    Map<String, String> m = new LinkedHashMap<>();
+                    m.put("department", t.getDepartment());
+                    m.put("organization", t.getOrganization());
+                    return m;
+                })
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public List<String> getAllOrganizations() {
         return targetRepository.findAll().stream()
                 .map(Target::getOrganization)
@@ -879,57 +917,253 @@ public class TargetServiceImpl implements TargetService {
     }
 
     @Override
-    public Map<String, List<TargetStatisticsResponse.QuarterlyData>> getQuarterlySummary(Integer year, String organization) {
-        Map<String, List<TargetStatisticsResponse.QuarterlyData>> result = new java.util.LinkedHashMap<>();
+    public Map<String, List<TargetStatisticsResponse.QuarterlyData>> getQuarterlySummary(Integer year, String department, String organization) {
+        Map<String, List<TargetStatisticsResponse.QuarterlyData>> result = new LinkedHashMap<>();
 
+        // 目标值：从 targets 表取
         List<Target> targets = targetRepository.findByYear(year);
 
+        // 部门筛选
+        if (department != null && !department.isEmpty()) {
+            targets = targets.stream()
+                    .filter(t -> department.equals(t.getDepartment()))
+                    .collect(Collectors.toList());
+        }
+
+        // 机构筛选
+        final Set<String> orgSet;
         if (organization != null && !organization.isEmpty()) {
-            Set<String> orgSet = new HashSet<>(Arrays.asList(organization.split(",")));
+            orgSet = new HashSet<>(Arrays.asList(organization.split(",")));
+        } else {
+            orgSet = null;
+        }
+        if (orgSet != null) {
             targets = targets.stream()
                     .filter(t -> orgSet.contains(t.getOrganization()))
                     .collect(Collectors.toList());
         }
 
-        result.put("signing", aggregateQuarterlyData(targets, "签约"));
-        result.put("confirmation", aggregateQuarterlyData(targets, "确权"));
-        result.put("budget", aggregateBudgetData(targets));
+        // 实际值：从原始数据来源表查询
+        String deptFilter = (department != null && !department.isEmpty()) ? department : null;
+        List<String> orgList = orgSet != null ? new ArrayList<>(orgSet) : null;
+
+        result.put("signing", aggregateSigningQuarterly(year, targets, deptFilter, orgList));
+        result.put("confirmation", aggregateConfirmationQuarterly(year, targets, deptFilter, orgList));
+        result.put("budget", aggregateBudgetQuarterly(year, targets, deptFilter, orgList));
 
         return result;
     }
 
-    private List<TargetStatisticsResponse.QuarterlyData> aggregateQuarterlyData(List<Target> targets, String keyword) {
-        List<Target> filtered = targets.stream()
-                .filter(t -> t.getSubCategory() != null && t.getSubCategory().contains(keyword))
+    /**
+     * 签约季度汇总：目标来自 targets，实际来自 dt_signing_contracts + dt_signing_orders
+     */
+    private List<TargetStatisticsResponse.QuarterlyData> aggregateSigningQuarterly(
+            Integer year, List<Target> targets, String department, List<String> organizations) {
+
+        // 目标聚合（从 targets 表）
+        List<Target> signingTargets = targets.stream()
+                .filter(t -> t.getSubCategory() != null && t.getSubCategory().contains("签约"))
                 .collect(Collectors.toList());
 
+        BigDecimal[] targets_q = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+        for (Target t : signingTargets) {
+            targets_q[0] = targets_q[0].add(t.getQ1Target() != null ? t.getQ1Target() : BigDecimal.ZERO);
+            targets_q[1] = targets_q[1].add(t.getQ2Target() != null ? t.getQ2Target() : BigDecimal.ZERO);
+            targets_q[2] = targets_q[2].add(t.getQ3Target() != null ? t.getQ3Target() : BigDecimal.ZERO);
+            targets_q[3] = targets_q[3].add(t.getQ4Target() != null ? t.getQ4Target() : BigDecimal.ZERO);
+        }
+
+        // 实际值聚合（从 dt_signing_contracts + dt_signing_orders）
+        BigDecimal[] actuals = aggregateSigningActuals(year, department);
+
+        return buildQuarterlyResult(targets_q, actuals);
+    }
+
+    private BigDecimal[] aggregateSigningActuals(Integer year, String department) {
+        BigDecimal[] actuals = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+
+        String contractsSql = "SELECT signing_quarter, SUM(COALESCE(signing_amount_wan, 0)) as total " +
+                "FROM dt_signing_contracts WHERE signing_quarter IS NOT NULL AND signing_quarter != ''";
+        if (department != null) contractsSql += " AND department = ?";
+
+        String ordersSql = "SELECT signing_quarter, SUM(COALESCE(order_amount_wan, 0)) as total " +
+                "FROM dt_signing_orders WHERE signing_quarter IS NOT NULL AND signing_quarter != ''";
+        if (department != null) ordersSql += " AND department = ?";
+
+        Map<String, BigDecimal> quarterAmounts = new LinkedHashMap<>();
+        quarterAmounts.put("一季度", BigDecimal.ZERO);
+        quarterAmounts.put("二季度", BigDecimal.ZERO);
+        quarterAmounts.put("三季度", BigDecimal.ZERO);
+        quarterAmounts.put("四季度", BigDecimal.ZERO);
+
+        // Query contracts
+        List<Map<String, Object>> contractRows;
+        if (department != null) {
+            contractRows = jdbcTemplate.queryForList(contractsSql, department);
+        } else {
+            contractRows = jdbcTemplate.queryForList(contractsSql);
+        }
+        for (Map<String, Object> row : contractRows) {
+            String q = (String) row.get("signing_quarter");
+            BigDecimal amt = row.get("total") != null ? new BigDecimal(row.get("total").toString()) : BigDecimal.ZERO;
+            if (quarterAmounts.containsKey(q)) {
+                quarterAmounts.put(q, quarterAmounts.get(q).add(amt));
+            }
+        }
+
+        // Query orders
+        List<Map<String, Object>> orderRows;
+        if (department != null) {
+            orderRows = jdbcTemplate.queryForList(ordersSql, department);
+        } else {
+            orderRows = jdbcTemplate.queryForList(ordersSql);
+        }
+        for (Map<String, Object> row : orderRows) {
+            String q = (String) row.get("signing_quarter");
+            BigDecimal amt = row.get("total") != null ? new BigDecimal(row.get("total").toString()) : BigDecimal.ZERO;
+            if (quarterAmounts.containsKey(q)) {
+                quarterAmounts.put(q, quarterAmounts.get(q).add(amt));
+            }
+        }
+
+        // Map to array (万元)
+        int i = 0;
+        for (BigDecimal amt : quarterAmounts.values()) {
+            actuals[i++] = amt.multiply(new BigDecimal("10000")); // 万元转元
+        }
+        return actuals;
+    }
+
+    /**
+     * 确权季度汇总：目标来自 targets，实际来自 dt_revenue_details
+     */
+    private List<TargetStatisticsResponse.QuarterlyData> aggregateConfirmationQuarterly(
+            Integer year, List<Target> targets, String department, List<String> organizations) {
+
+        // 目标聚合
+        List<Target> confTargets = targets.stream()
+                .filter(t -> t.getSubCategory() != null && t.getSubCategory().contains("确权"))
+                .collect(Collectors.toList());
+
+        BigDecimal[] targets_q = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+        for (Target t : confTargets) {
+            targets_q[0] = targets_q[0].add(t.getQ1Target() != null ? t.getQ1Target() : BigDecimal.ZERO);
+            targets_q[1] = targets_q[1].add(t.getQ2Target() != null ? t.getQ2Target() : BigDecimal.ZERO);
+            targets_q[2] = targets_q[2].add(t.getQ3Target() != null ? t.getQ3Target() : BigDecimal.ZERO);
+            targets_q[3] = targets_q[3].add(t.getQ4Target() != null ? t.getQ4Target() : BigDecimal.ZERO);
+        }
+
+        // 实际值：从 dt_revenue_details 按 recognition_month 分季度聚合
+        BigDecimal[] actuals = aggregateRevenueActuals(year, organizations);
+
+        return buildQuarterlyResult(targets_q, actuals);
+    }
+
+    private BigDecimal[] aggregateRevenueActuals(Integer year, List<String> organizations) {
+        BigDecimal[] actuals = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+
+        StringBuilder sql = new StringBuilder(
+                "SELECT recognition_month, SUM(COALESCE(revenue_amount_wan, 0)) as total " +
+                "FROM dt_revenue_details WHERE recognition_month IS NOT NULL AND recognition_month != ''");
+
+        List<Object> params = new ArrayList<>();
+        if (organizations != null && !organizations.isEmpty()) {
+            sql.append(" AND org_unit IN (");
+            for (int i = 0; i < organizations.size(); i++) {
+                if (i > 0) sql.append(",");
+                sql.append("?");
+                params.add(organizations.get(i));
+            }
+            sql.append(")");
+        }
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql.toString(), params.toArray());
+        for (Map<String, Object> row : rows) {
+            String month = (String) row.get("recognition_month");
+            BigDecimal amt = row.get("total") != null ? new BigDecimal(row.get("total").toString()) : BigDecimal.ZERO;
+            int q = monthToQuarter(month);
+            if (q >= 0 && q < 4) {
+                actuals[q] = actuals[q].add(amt);
+            }
+        }
+
+        // 万元转元
+        for (int i = 0; i < 4; i++) {
+            actuals[i] = actuals[i].multiply(new BigDecimal("10000"));
+        }
+        return actuals;
+    }
+
+    /**
+     * 预算季度汇总：目标来自 targets，实际来自 dt_department_budgets
+     */
+    private List<TargetStatisticsResponse.QuarterlyData> aggregateBudgetQuarterly(
+            Integer year, List<Target> targets, String department, List<String> organizations) {
+
+        // 目标聚合
+        List<Target> budgetTargets = targets.stream()
+                .filter(t -> "费用".equals(t.getSubCategory()))
+                .collect(Collectors.toList());
+
+        BigDecimal[] targets_q = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
+        for (Target t : budgetTargets) {
+            targets_q[0] = targets_q[0].add(t.getQ1Target() != null ? t.getQ1Target() : BigDecimal.ZERO);
+            targets_q[1] = targets_q[1].add(t.getQ2Target() != null ? t.getQ2Target() : BigDecimal.ZERO);
+            targets_q[2] = targets_q[2].add(t.getQ3Target() != null ? t.getQ3Target() : BigDecimal.ZERO);
+            targets_q[3] = targets_q[3].add(t.getQ4Target() != null ? t.getQ4Target() : BigDecimal.ZERO);
+        }
+
+        // 实际值：从 dt_department_budgets 按年度总计均分到四季度
+        BigDecimal[] actuals = aggregateBudgetActuals(year, department);
+
+        return buildQuarterlyResult(targets_q, actuals);
+    }
+
+    private BigDecimal[] aggregateBudgetActuals(Integer year, String department) {
+        String sql = "SELECT SUM(COALESCE(actual_cost_total, 0)) as total FROM dt_department_budgets";
+        BigDecimal total;
+        if (department != null) {
+            total = jdbcTemplate.queryForObject(sql + " WHERE dept_name = ?", BigDecimal.class, department);
+        } else {
+            total = jdbcTemplate.queryForObject(sql, BigDecimal.class);
+        }
+        if (total == null) total = BigDecimal.ZERO;
+        // 预算表存的是万元，均分到四季度
+        BigDecimal perQuarter = total.divide(new BigDecimal("4"), 2, RoundingMode.HALF_UP)
+                .multiply(new BigDecimal("10000")); // 万元转元
+        return new BigDecimal[]{perQuarter, perQuarter, perQuarter, perQuarter};
+    }
+
+    private List<TargetStatisticsResponse.QuarterlyData> buildQuarterlyResult(
+            BigDecimal[] targets, BigDecimal[] actuals) {
         String[] quarterNames = {"Q1", "Q2", "Q3", "Q4"};
         List<TargetStatisticsResponse.QuarterlyData> result = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
-            BigDecimal sumTarget = BigDecimal.ZERO;
-            BigDecimal sumActual = BigDecimal.ZERO;
-            for (Target t : filtered) {
-                BigDecimal[] targets_q = {t.getQ1Target(), t.getQ2Target(), t.getQ3Target(), t.getQ4Target()};
-                BigDecimal[] actuals = {t.getQ1Actual(), t.getQ2Actual(), t.getQ3Actual(), t.getQ4Actual()};
-                sumTarget = sumTarget.add(targets_q[i] != null ? targets_q[i] : BigDecimal.ZERO);
-                sumActual = sumActual.add(actuals[i] != null ? actuals[i] : BigDecimal.ZERO);
-            }
             BigDecimal rate = BigDecimal.ZERO;
-            if (sumTarget.compareTo(BigDecimal.ZERO) > 0) {
-                rate = sumActual.divide(sumTarget, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"));
+            if (targets[i].compareTo(BigDecimal.ZERO) > 0) {
+                rate = actuals[i].divide(targets[i], 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"));
             }
             result.add(TargetStatisticsResponse.QuarterlyData.builder()
                     .quarter(quarterNames[i])
-                    .target(sumTarget)
-                    .actual(sumActual)
+                    .target(targets[i])
+                    .actual(actuals[i])
                     .completionRate(rate)
                     .build());
         }
         return result;
     }
 
-    private List<TargetStatisticsResponse.QuarterlyData> aggregateBudgetData(List<Target> targets) {
-        return aggregateQuarterlyData(targets, "费用");
+    private int monthToQuarter(String month) {
+        if (month == null) return -1;
+        try {
+            String[] parts = month.split("-");
+            int m = Integer.parseInt(parts[parts.length - 1]);
+            if (m >= 1 && m <= 3) return 0;
+            if (m >= 4 && m <= 6) return 1;
+            if (m >= 7 && m <= 9) return 2;
+            if (m >= 10 && m <= 12) return 3;
+        } catch (Exception ignored) {}
+        return -1;
     }
 
     @Override

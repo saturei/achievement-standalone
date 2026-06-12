@@ -39,6 +39,47 @@ public class DingTalkClient {
         return listRecordsWithFieldNames(sheetId, props.getBaseId());
     }
 
+    /**
+     * 根据 sheet 名称解析为 sheet ID，用于兼容配置中使用名称而非 ID 的场景
+     */
+    public String resolveSheetId(String sheetNameOrId) {
+        return resolveSheetId(sheetNameOrId, props.getBaseId());
+    }
+
+    public String resolveSheetId(String sheetNameOrId, String baseId) {
+        if (sheetNameOrId == null || sheetNameOrId.isEmpty()) return sheetNameOrId;
+        try {
+            String token = authService.getAccessToken();
+            String url = BASE_URL + "/bases/" + baseId + "/sheets";
+            if (props.getOperatorId() != null && !props.getOperatorId().isEmpty())
+                url += "?operatorId=" + props.getOperatorId();
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-acs-dingtalk-access-token", token);
+            ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            callCounter.incrementAndGet();
+            if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> sheets = (List<Map<String, Object>>) resp.getBody().get("value");
+                if (sheets != null) {
+                    List<String> sheetNames = new ArrayList<>();
+                    for (Map<String, Object> sheet : sheets) {
+                        String name = (String) sheet.get("name");
+                        String id = (String) sheet.get("id");
+                        sheetNames.add(name + "(" + id + ")");
+                        if (sheetNameOrId.equals(id) || sheetNameOrId.equals(name)) {
+                            log.info("Sheet 名称解析: {} -> {}", sheetNameOrId, id);
+                            return id;
+                        }
+                    }
+                    log.warn("Sheet '{}' 未找到，base 中现有 sheet: {}", sheetNameOrId, sheetNames);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Sheet 名称解析异常: {}, 使用原始值", e.getMessage());
+        }
+        return sheetNameOrId;
+    }
+
     // ---- public: use override baseId (for data warehouse) ----
     public List<Map<String, Object>> listAllRecords(String sheetId, String baseId) {
         List<Map<String, Object>> allRecords = new ArrayList<>();
@@ -144,6 +185,38 @@ public class DingTalkClient {
             return String.valueOf(first);
         }
         return String.valueOf(val);
+    }
+
+    /**
+     * 列出 base 中所有 sheet（id + name）
+     */
+    public List<Map<String, String>> listSheets(String baseId) {
+        List<Map<String, String>> sheets = new ArrayList<>();
+        try {
+            String token = authService.getAccessToken();
+            String url = BASE_URL + "/bases/" + baseId + "/sheets";
+            if (props.getOperatorId() != null && !props.getOperatorId().isEmpty())
+                url += "?operatorId=" + props.getOperatorId();
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-acs-dingtalk-access-token", token);
+            ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            callCounter.incrementAndGet();
+            if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> value = (List<Map<String, Object>>) resp.getBody().get("value");
+                if (value != null) {
+                    for (Map<String, Object> s : value) {
+                        Map<String, String> item = new LinkedHashMap<>();
+                        item.put("id", (String) s.get("id"));
+                        item.put("name", (String) s.get("name"));
+                        sheets.add(item);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("获取 sheet 列表失败: {}", e.getMessage());
+        }
+        return sheets;
     }
 
     @Deprecated

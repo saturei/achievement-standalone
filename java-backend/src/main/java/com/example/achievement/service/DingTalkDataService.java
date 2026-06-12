@@ -28,6 +28,7 @@ public class DingTalkDataService {
     private final DtProductRepository productRepository;
     private final DtProductPackageRepository productPackageRepository;
     private final DtDepartmentBudgetRepository departmentBudgetRepository;
+    private final DtProjectOrderCostRepository projectOrderCostRepository;
     private final TargetRepository targetRepository;
     private final JdbcTemplate jdbcTemplate;
     private final DingTalkClient client;
@@ -37,6 +38,11 @@ public class DingTalkDataService {
 
     private static final Set<String> MANAGED_SHEET_IDS = new LinkedHashSet<>(Arrays.asList(
             "O0DHU7u", "LfxeQF7", "BRNEkOg", "IjclEN7", "SXS7oOg", "Jwe8QNe", "drgfZh4"
+    ));
+
+    /** 主 Base 中的 sheet（使用 baseId 而非 dataWarehouseBaseId） */
+    private static final Set<String> MAIN_BASE_SHEET_IDS = new LinkedHashSet<>(Arrays.asList(
+            "rVbHRpZ"
     ));
 
     /** 当前年份（用于没有明确年份字段的聚合） */
@@ -74,6 +80,27 @@ public class DingTalkDataService {
                 }
 
                 int count = syncSheetData(sheetId, dataRows);
+                result.put(sheetId + "_count", count);
+                result.put(sheetId + "_status", "ok");
+            } catch (Exception e) {
+                log.error("同步表格 {} 失败: {}", sheetId, e.getMessage(), e);
+                result.put(sheetId + "_count", 0);
+                result.put(sheetId + "_status", "error: " + e.getMessage());
+            }
+        }
+
+        // 同步主 Base 的 sheet
+        for (String sheetId : MAIN_BASE_SHEET_IDS) {
+            try {
+                log.info("同步主Base表格 sheetId={}", sheetId);
+                List<Map<String, String>> dataRows = client.listRecordsWithFieldNames(sheetId, props.getBaseId());
+                if (dataRows == null || dataRows.isEmpty()) {
+                    log.warn("表格 {} 数据为空，跳过同步", sheetId);
+                    result.put(sheetId + "_count", 0);
+                    result.put(sheetId + "_status", "empty_skipped");
+                    continue;
+                }
+                int count = syncMainBaseSheetData(sheetId, dataRows);
                 result.put(sheetId + "_count", count);
                 result.put(sheetId + "_status", "ok");
             } catch (Exception e) {
@@ -135,6 +162,10 @@ public class DingTalkDataService {
     }
 
     private int syncSheetData(String sheetId, List<Map<String, String>> dataRows) {
+        return syncSheetDataPublic(sheetId, dataRows);
+    }
+
+    public int syncSheetDataPublic(String sheetId, List<Map<String, String>> dataRows) {
         switch (sheetId) {
             case "O0DHU7u": return syncSigningContracts(dataRows);
             case "LfxeQF7": return syncSigningOrders(dataRows);
@@ -143,8 +174,18 @@ public class DingTalkDataService {
             case "SXS7oOg": return syncProducts(dataRows);
             case "Jwe8QNe": return syncProductPackages(dataRows);
             case "drgfZh4": return syncDepartmentBudgets(dataRows);
+            case "ZwUu7oL": return syncProjectOrderCosts(dataRows);
             default:
                 log.warn("未知表格ID: {}", sheetId);
+                return 0;
+        }
+    }
+
+    public int syncMainBaseSheetData(String sheetId, List<Map<String, String>> dataRows) {
+        switch (sheetId) {
+            case "rVbHRpZ": return syncProjectOrderCosts(dataRows);
+            default:
+                log.warn("未知主Base表格ID: {}", sheetId);
                 return 0;
         }
     }
@@ -362,6 +403,89 @@ public class DingTalkDataService {
         departmentBudgetRepository.saveAll(entities);
         log.info("部门预算同步完成: {} 条", entities.size());
         return entities.size();
+    }
+
+    private int syncProjectOrderCosts(List<Map<String, String>> rows) {
+        String now = java.time.LocalDateTime.now().toString().substring(0, 19);
+        List<String> dingTalkOrderIds = new ArrayList<>();
+        int inserted = 0;
+        int updated = 0;
+
+        // 1. 收集钉钉订单ID，更新或插入记录
+        for (Map<String, String> row : rows) {
+            try {
+                String orderId = row.getOrDefault("订单编号", "");
+                if (orderId.isEmpty()) {
+                    log.warn("映射项目订单成本跳过: 订单编号为空");
+                    continue;
+                }
+                dingTalkOrderIds.add(orderId);
+
+                // 查找已存在记录（按 order_id）
+                Optional<DtProjectOrderCost> existing = projectOrderCostRepository.findAll().stream()
+                        .filter(e -> e.getSyncStatus() == null || "ACTIVE".equals(e.getSyncStatus()))
+                        .filter(e -> orderId.equals(e.getOrderId()))
+                        .findFirst();
+
+                DtProjectOrderCost e;
+                if (existing.isPresent()) {
+                    e = existing.get();
+                    updated++;
+                } else {
+                    e = new DtProjectOrderCost();
+                    e.setId(UUID.randomUUID().toString());
+                    inserted++;
+                }
+
+                e.setOrderName(row.getOrDefault("订单名称", ""));
+                e.setParentOrderId(row.getOrDefault("订单", ""));
+                e.setOrderCategory(row.getOrDefault("订单类别", ""));
+                e.setOrderStatus(row.getOrDefault("订单状态", ""));
+                e.setProjectId(row.getOrDefault("关联项目编号", ""));
+                e.setProductId(row.getOrDefault("关联产品ID", ""));
+                e.setDepartment(row.getOrDefault("订单所属部门", ""));
+                e.setOrganization(row.getOrDefault("所属机构", ""));
+                e.setPlanStartDate(row.getOrDefault("计划开始日期", null));
+                e.setPlanEndDate(row.getOrDefault("计划结束日期", null));
+                e.setOrderCreateDate(row.getOrDefault("订单创建日期", null));
+                e.setOrderBudget(parseDec(row.get("订单费用预算")));
+                e.setProjectBudgetCost(parseDec(row.get("项目预算口径成本数")));
+                e.setBookedCost(parseDec(row.get("订单已入账成本（财务）")));
+                e.setUnbookedCost(parseDec(row.get("订单未入账成本")));
+                e.setActualCostTotal(parseDec(row.get("实际成本合计")));
+                e.setEstimatedManDays(parseDec(row.get("订单预计工作量（人天）")));
+                e.setActualAttendanceDays(parseDec(row.get("实际出勤人天a")));
+                e.setActualPerformanceDays(parseDec(row.get("实际绩效人天b")));
+                e.setExecutor(row.getOrDefault("执行人", ""));
+                e.setResponsible(row.getOrDefault("责任人", ""));
+                e.setCreateDesc(row.getOrDefault("创建描述", ""));
+                e.setSyncDate(now);
+                e.setFinanceDate(row.getOrDefault("财务记账日期", ""));
+                e.setRawJson(toJson(row));
+                e.setSyncStatus("ACTIVE");
+                projectOrderCostRepository.save(e);
+            } catch (Exception ex) {
+                log.warn("映射项目订单成本跳过: {}", ex.getMessage());
+            }
+        }
+
+        // 2. 标记不在钉钉中的旧记录为 DELETED
+        int deleted = 0;
+        if (!dingTalkOrderIds.isEmpty()) {
+            List<DtProjectOrderCost> allActive = projectOrderCostRepository.findAll().stream()
+                    .filter(e -> e.getSyncStatus() == null || "ACTIVE".equals(e.getSyncStatus()))
+                    .filter(e -> e.getOrderId() != null && !dingTalkOrderIds.contains(e.getOrderId()))
+                    .collect(Collectors.toList());
+            for (DtProjectOrderCost e : allActive) {
+                e.setSyncStatus("DELETED");
+                e.setSyncDate(now);
+                projectOrderCostRepository.save(e);
+                deleted++;
+            }
+        }
+
+        log.info("项目订单成本同步完成: 新增={}, 更新={}, 标记删除={}, 总计={}", inserted, updated, deleted, rows.size());
+        return inserted + updated;
     }
 
     // ======================== 目标数据聚合 ========================

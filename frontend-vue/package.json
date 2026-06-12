@@ -1,7 +1,7 @@
 {
   "name": "achievement-frontend",
   "version": "1.0.0",
-  "description": "成果管理系统前端",
+  "description": "产品目标管理平台前端",
   "type": "module",
   "scripts": {
     "dev": "vite",

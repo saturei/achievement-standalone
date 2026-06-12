@@ -24,9 +24,11 @@ public interface TargetService {
     /**
      * 获取月度成果分布
      * @param year 年份
+     * @param department 部门筛选（可选）
+     * @param organization 机构筛选（可选）
      * @return 月度分布响应
      */
-    MonthlyDistributionResponse getMonthlyDistribution(Integer year);
+    MonthlyDistributionResponse getMonthlyDistribution(Integer year, String department, String organization);
 
     /**
      * 保存实际数据
@@ -47,6 +49,18 @@ public interface TargetService {
      * @return 产品列表
      */
     List<String> getAllProducts();
+
+    /**
+     * 获取所有部门列表
+     * @return 部门列表
+     */
+    List<String> getAllDepartments();
+
+    /**
+     * 获取部门-机构对照关系
+     * @return [{"department": "...", "organization": "..."}]
+     */
+    List<java.util.Map<String, String>> getDepartmentOrganizationMap();
 
     /**
      * 获取所有机构列表
@@ -91,9 +105,10 @@ public interface TargetService {
     /**
      * 获取季度汇总数据（按签约/确权/预算分组）
      * @param year 年份
+     * @param department 部门筛选（可选）
      * @param organization 机构筛选（可选）
      * @return 分组季度数据
      */
     java.util.Map<String, java.util.List<com.example.achievement.dto.response.TargetStatisticsResponse.QuarterlyData>>
-        getQuarterlySummary(Integer year, String organization);
+        getQuarterlySummary(Integer year, String department, String organization);
 }

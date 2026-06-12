@@ -38,7 +38,6 @@
         <el-form-item>
           <el-button @click="handleReset">重置</el-button>
           <el-button type="primary" @click="handlePreRegister">预注册</el-button>
-          <el-button v-if="dtConfigured" type="warning" :loading="syncingFromDingTalk" @click="syncFromDingTalk">从钉钉同步</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -108,31 +107,31 @@
         style="width: 100%"
         max-height="70vh"
       >
-        <el-table-column prop="departmentName" label="部门" min-width="120" />
-        <el-table-column prop="organizationName" label="机构" min-width="150" />
-        <el-table-column prop="name" label="成果名称" min-width="150">
+        <el-table-column prop="departmentName" label="部门" min-width="120" sortable />
+        <el-table-column prop="organizationName" label="机构" min-width="150" sortable />
+        <el-table-column prop="name" label="成果名称" min-width="150" sortable>
           <template #default="{ row }">
             <el-link type="primary" @click="viewDetail(row.id)">
               {{ row.name }}
             </el-link>
           </template>
         </el-table-column>
-        <el-table-column prop="version" label="版本" width="100" />
-        <el-table-column label="产品" width="200">
+        <el-table-column prop="version" label="版本" width="100" sortable />
+        <el-table-column label="产品" width="200" prop="productId" sortable>
           <template #default="{ row }">
             {{ formatProduct(row.productId, row.productName) }}
           </template>
         </el-table-column>
-        <el-table-column prop="achievementForm" label="成果形态" width="100" />
-        <el-table-column prop="owner" label="负责人" width="100" />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="achievementForm" label="成果形态" width="100" sortable />
+        <el-table-column prop="owner" label="负责人" width="100" sortable />
+        <el-table-column prop="status" label="状态" width="100" sortable>
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">
               {{ getStatusText(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="180">
+        <el-table-column prop="createdAt" label="创建时间" width="180" sortable>
           <template #default="{ row }">
             {{ formatDate(row.createdAt) }}
           </template>
@@ -205,14 +204,11 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import axios from 'axios'
 import achievementApi from '../api/achievement'
 
 const router = useRouter()
 const loading = ref(false)
 const achievements = ref([])
-const dtConfigured = ref(false)
-const syncingFromDingTalk = ref(false)
 const organizationOptions = ref([])
 const departmentOptions = ref([])
 const statistics = ref({
@@ -259,33 +255,7 @@ onMounted(() => {
   loadStatistics()
   loadAchievements()
   loadFilterOptions()
-  checkDingTalkStatus()
 })
-
-// 检查钉钉配置状态
-const checkDingTalkStatus = async () => {
-  try {
-    const res = await axios.get('/api/detail/dingtalk-status')
-    dtConfigured.value = res.data?.configured === true
-  } catch (e) {
-    dtConfigured.value = false
-  }
-}
-
-// 从钉钉同步成果
-const syncFromDingTalk = async () => {
-  syncingFromDingTalk.value = true
-  try {
-    const res = await axios.post('/api/achievements/sync-from-dingtalk')
-    const { imported, skipped, total } = res.data
-    ElMessage.success(`从钉钉同步完成：导入 ${imported} 条，跳过 ${skipped} 条，共 ${total} 条`)
-    loadAchievements()
-  } catch (e) {
-    ElMessage.error('从钉钉同步失败: ' + (e.response?.data?.error || e.message))
-  } finally {
-    syncingFromDingTalk.value = false
-  }
-}
 
 const loadFilterOptions = async () => {
   try {
